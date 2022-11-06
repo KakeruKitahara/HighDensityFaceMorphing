@@ -1,2 +1,5 @@
-# face
-卒業研究の際の潜在空間上の表情モーフィング（Semantic Style GAN）
+### セットアップ
+
+1. CUDAをDL : [https://developer.nvidia.com/cuda-toolkit-archive](https://developer.nvidia.com/cuda-toolkit-archive)
+2. cuDNNをDL : [https://developer.nvidia.com/rdp/cudnn-archive](https://developer.nvidia.com/rdp/cudnn-archive)
+3. 

@@ -1,0 +1,26 @@
+version: "3.2"
+
+services:
+  pytorch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: torch
+    tty: true
+
+    # bindでcontainerにファイルをマウントさせる．
+    volumes:
+      - type: bind
+        source: SemanticStyleGAN
+        target: /root/work
+    ports:
+      - "8888:8888"
+    command:
+      jupyter-lab --ip 0.0.0.0 --allow-root -b localhost
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            capabilities: [gpu]
+
