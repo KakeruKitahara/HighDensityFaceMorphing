@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: torch
+    container_name: highmorph
     tty: true
 
     # bindでcontainerにファイルをマウントさせる．
