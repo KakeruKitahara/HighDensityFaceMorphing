@@ -1,11 +1,11 @@
 version: "3.2"
 
 services:
-  pytorch:
+  pytorch2:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: highmorph
+    container_name: highmorph2
     tty: true
 
     # bindでcontainerにファイルをマウントさせる．
@@ -13,10 +13,11 @@ services:
       - type: bind
         source: SemanticStyleGAN
         target: /root/work
+    # ホストのport番号 : コンテナのport番号．Jupyter Lab（notebook)はデフォルトで8888番．
     ports:
-      - "8888:8888"
+      - "8080:8888"
     command:
-      jupyter-lab --ip 0.0.0.0 --allow-root -b localhost
+      jupyter-lab --ip 0.0.0.0 --allow-root --NotebookApp.token=''
     deploy:
       resources:
         reservations:

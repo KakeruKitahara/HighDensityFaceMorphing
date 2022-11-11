@@ -130,3 +130,18 @@ dmypy.json
 .pt
 .DS_Store
 data/
+
+
+# data
+
+/results/components/*
+!/results/components/.gitkeep
+
+/results/samples*
+!/results/samples/.gitkeep
+
+/results/interpolation/*
+!/results/interpolation/.gitkeep
+
+/pretrained/*
+!/pretrained/.gitkeep

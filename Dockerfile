@@ -1,12 +1,12 @@
-FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
+FROM nvidia/cuda:11.2.0-cudnn8-devel-ubuntu18.04
 
 RUN apt-get update
-RUN apt-get install -y git \
-  python3 \
+RUN apt-get install -y python3 \
   python3-pip \
   curl
 
-WORKDIR /work
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 30 && \
+  update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 30
 
 # SemanticStyleGANはv1.0.0 ( https://github.com/seasonSH/SemanticStyleGAN#pretrained-models )
 COPY SemanticStyleGAN/requirements.txt .
@@ -17,7 +17,6 @@ RUN pip install jupyterlab
 # 依存関係ファイルの削除
 RUN apt-get autoremove -y && apt-get clean && \
   rm -rf /usr/local/src/*
-
 
 # nodejs v16 をインストール．この際にnpmもインストールされる．
 RUN curl -sL https://deb.nodesource.com/setup_16.x | bash -
