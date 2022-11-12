@@ -19,12 +19,7 @@ Dockerを用いて仮想コンテナ上で開発環境を実装する．ファ�
 
 
 ## 使用方法
-
-### StyleGAN_LatentEditor
-- 作成中
-
-### StyleGAN2
-- 作成中
+  docker起動し，`main.ipynb`をjupyter nootbookなどで参照すること．
 
 ## Docker環境
 Dockerで実装した環境をここに記す．
@@ -34,8 +29,7 @@ Dockerで実装した環境をここに記す．
 - `dpkg -l | grep 'cudnn'` : cuDNNのバージョン
 - `pip list | grep 'torch'` : pytorch, torchvisionのバージョン
 - `pip list | grep 'tensorflow'` : tensorflow, tensorflow-gpuのバージョン
-
-### StyleGAN_LatentEditor　
+　
 ```
 OS : ubuntu18.04
 CUDA : 10.0
@@ -45,21 +39,14 @@ torchvision : 0.11.2
 tensorflow, tensorflow-gpu : 1.14.0
 ```
 
-### StyleGAN2
-```
-OS : ubuntu18.04
-CUDA : 10.1
-cuDNN : 7.6.5.32
-pytorch : 1.10.2
-torchvision : 0.9.1
-tensorflow, tensorflow-gpu : 2.3.0
-```
-
 ## クレジット
 - 作成中
 
 ## 免責
 - 作成中
 
-## Docker環境
-- 作成中
+## 免責
+生じた如何なる損害や修正や更新も責任を負いません． 使用する際は自己責任でお願いします．
+
+## クレジット
+- [Semantic StyleGAN](https://github.com/seasonSH/SemanticStyleGAN#pretrained-models)

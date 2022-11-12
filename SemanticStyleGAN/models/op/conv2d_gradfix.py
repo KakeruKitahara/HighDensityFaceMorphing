@@ -90,7 +90,7 @@ def could_use_op(input):
     if input.device.type != "cuda":
         return False
 
-    if any(torch.__version__.startswith(x) for x in ["1.7.", "1.8."]):
+    if any(torch.__version__.startswith(x) for x in ["1.7.", "1.8.", "1.12.0"]): # ここにversionが該当しないとErrorが出る．
         return True
 
     warnings.warn(

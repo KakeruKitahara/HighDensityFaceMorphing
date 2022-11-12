@@ -1,11 +1,11 @@
 version: "3.2"
 
 services:
-  pytorch2:
+  pytorch:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: highmorph2
+    container_name: highmorph
     tty: true
 
     # bindでcontainerにファイルをマウントさせる．

@@ -3,6 +3,7 @@ FROM nvidia/cuda:11.2.0-cudnn8-devel-ubuntu18.04
 RUN apt-get update
 RUN apt-get install -y python3 \
   python3-pip \
+  python3.7-dev \
   curl
 
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 30 && \
