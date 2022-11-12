@@ -32,11 +32,10 @@ Dockerで実装した環境をここに記す．
 　
 ```
 OS : ubuntu18.04
-CUDA : 10.0
+CUDA : 11.2
 cuDNN : 7.0
 pytorch : 1.10.1
 torchvision : 0.11.2
-tensorflow, tensorflow-gpu : 1.14.0
 ```
 
 ## クレジット
