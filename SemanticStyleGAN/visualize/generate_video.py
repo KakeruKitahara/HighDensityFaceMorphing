@@ -46,6 +46,11 @@ latent_dict_celeba = {
     19: "neck_texture",
     20: "cloth_shape",
     21: "cloth_texture",
+    22: "glass",
+    24: "hat",
+    26: "earing",
+    0:  "coarse_1",
+    1:  "coarse_2",
 }
 
 if __name__ == '__main__':
@@ -55,7 +60,7 @@ if __name__ == '__main__':
     parser.add_argument('ckpt', type=str, help="path to the model checkpoint")
     parser.add_argument('--latent', type=str, default=None,
         help="path to the latent numpy")
-    parser.add_argument('--outdir', type=str, default='./results/random_walk/', 
+    parser.add_argument('--outdir', type=str, default='./results/interpolation/', 
         help="path to the output directory")
     parser.add_argument('--batch', type=int, default=8, help="batch size for inference")
     parser.add_argument("--sample", type=int, default=10,
@@ -89,7 +94,10 @@ if __name__ == '__main__':
             styles = model.style(torch.randn(1, model.style_dim, device=args.device))
             styles = args.truncation * styles + (1-args.truncation) * mean_latent.unsqueeze(0)
         else:
-            styles = torch.tensor(np.load(args.latent), device=args.device).reshape(1,model.style_dim)
+            styles = torch.tensor(np.load(args.latent), device=args.device)
+        if styles.ndim == 2:
+            assert styles.size(1) == model.style_dim
+            styles = styles.unsqueeze(1).repeat(1, model.n_latent, 1)
         images, segs = generate(model, styles, mean_latent=mean_latent, randomize_noise=False)
         imageio.imwrite(f'{args.outdir}/image.jpeg', images[0])
         imageio.imwrite(f'{args.outdir}/seg.jpeg', segs[0])
@@ -102,7 +110,7 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         for latent_index, latent_name in latent_dict.items():
-            styles_new = styles.unsqueeze(1).repeat(args.sample, model.n_latent, 1)
+            styles_new = styles.repeat(args.sample, 1, 1)
             mix_styles = model.style(torch.randn(args.sample, 512, device=args.device))
             mix_styles[-1] = mix_styles[0]
             mix_styles = args.truncation * mix_styles + (1-args.truncation) * mean_latent.unsqueeze(0)
@@ -114,3 +122,4 @@ if __name__ == '__main__':
  
             frames = [np.concatenate((img,seg),1) for (img,seg) in zip(images,segs)]
             imageio.mimwrite(f'{args.outdir}/{latent_index:02d}_{latent_name}.mp4', frames, fps=20)
+            print(f"{args.outdir}/{latent_index:02d}_{latent_name}.mp4")

@@ -143,5 +143,8 @@ data/
 /results/interpolation/*
 !/results/interpolation/.gitkeep
 
+/results/inversion/*
+!/results/inversion/.gitkeep
+
 /pretrained/*
 !/pretrained/.gitkeep

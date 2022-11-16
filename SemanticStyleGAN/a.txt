@@ -1,5 +1,5 @@
-PYTHONPATH=.:$PYTHONPATH python visualize/generate.py pretrained/CelebAMask-HQ-512x512.pt --outdir results/samples --sample 20 --save_latent
+PYTHONPATH=.:$PYTHONPATH python visualize/generate.py pretrained/CelebAMask-HQ-512x512.pt(finetuneのpt) --outdir results/samples --sample 20 --save_latent
 PYTHONPATH=.:$PYTHONPATH python visualize/generate_video.py pretrained/CelebAMask-HQ-512x512.pt --outdir results/interpolation --latent results/samples/000000_latent.npy
 PYTHONPATH=.:$PYTHONPATH python visualize/generate_components.py pretrained/CelebAMask-HQ-512x512.pt --outdir results/components --latent results/samples/000000_latent.npy
-
+PYTHONPATH=.:$PYTHONPATH python visualize/invert.py --ckpt pretrained/CelebAMask-HQ-512x512.pt --imgdir images --outdir results/inversion --size 512 --finetune_step 400
 conv2dでエラーが出るが気にしなくていい．
