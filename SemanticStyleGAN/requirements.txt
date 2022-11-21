@@ -11,4 +11,3 @@ imageio-ffmpeg
 albumentations
 imgaug
 ninja
-libgl1-mesa-dev

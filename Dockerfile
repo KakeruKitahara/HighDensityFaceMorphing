@@ -6,7 +6,8 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
   python3 \
   curl \
-  python3.7-dev && \
+  python3.7-dev \
+  libgl1-mesa-dev && \
   apt-get install -y python3-pip && \
   curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
   apt-get install -y --no-install-recommends nodejs && \
@@ -27,9 +28,10 @@ RUN pip install --upgrade pip && \
   jupyterlab \
   autopep8 \
   jupyterlab_code_formatter && \
-  pip install -r requirements.txt
+  pip install -r requirements.txt && \
+  rm -rf ~/.cache/pip
 
 # @lckr/jupyterlab_variableinspector@3.0.7 : 自動整形，@lckr/jupyterlab_variableinspector@3.0.7 : 変数や行列の中身を確認
 RUN jupyter labextension install @lckr/jupyterlab_variableinspector@3.0.7 &&\
-  jupyter labextension install@lckr/jupyterlab_variableinspector@3.0.7 &&\
-  jupyter serverextension enable --py jupyterlab_code_formatte
+  jupyter labextension install @ryantam626/jupyterlab_code_formatter &&\
+  jupyter serverextension enable --py jupyterlab_code_formatter
