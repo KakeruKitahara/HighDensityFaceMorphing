@@ -39,7 +39,7 @@ color_map = {
     16: [116, 95, 159],
 }
 
-def generate_img(model, styles, mean_latent=None, truncation=1.0, batch_size=16, *args, **kwargs):
+def generate_img(model, styles, mean_latent=None, truncation=1.0, batch_size=16, *args, **kwargs): # *args : アンパッキング
     images = []
     for head in range(0, styles.size(0), batch_size):
         images_, _ = model([styles[head:head+batch_size]], input_is_latent=True,

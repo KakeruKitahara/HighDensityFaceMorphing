@@ -86,7 +86,7 @@ if __name__ == '__main__':
     model.to(args.device)
     model.eval()
     model.load_state_dict(ckpt['g_ema'])
-    mean_latent = model.style(torch.randn(args.truncation_mean, model.style_dim, device=args.device)).mean(0)
+    mean_latent = model.style(torch.randn(args.truncation_mean, model.style_dim, device=args.device)).mean(0) # 10000回のmeanをとる512
 
     print("Generating original image ...")
     with torch.no_grad():
@@ -94,7 +94,7 @@ if __name__ == '__main__':
             styles = model.style(torch.randn(1, model.style_dim, device=args.device))
             styles = args.truncation * styles + (1-args.truncation) * mean_latent.unsqueeze(0)
         else:
-            styles = torch.tensor(np.load(args.latent), device=args.device)
+            styles = torch.tensor(np.load(args.latent), device=args.device) 
         if styles.ndim == 2:
             assert styles.size(1) == model.style_dim
             styles = styles.unsqueeze(1).repeat(1, model.n_latent, 1)
@@ -115,11 +115,10 @@ if __name__ == '__main__':
             mix_styles[-1] = mix_styles[0]
             mix_styles = args.truncation * mix_styles + (1-args.truncation) * mean_latent.unsqueeze(0)
             mix_styles = mix_styles.unsqueeze(1).repeat(1,model.n_latent,1)
-            styles_new[:,latent_index] = mix_styles[:,latent_index]
+            styles_new[:,latent_index] = mix_styles[:,latent_index] 
             styles_new = cubic_spline_interpolate(styles_new, step=args.steps)
             images, segs = generate(model, styles_new, mean_latent=mean_latent, 
                         randomize_noise=False, batch_size=args.batch)
- 
             frames = [np.concatenate((img,seg),1) for (img,seg) in zip(images,segs)]
-            imageio.mimwrite(f'{args.outdir}/{latent_index:02d}_{latent_name}.mp4', frames, fps=20)
+            imageio.mimwrite(f'{args.outdir}/{latent_index:02d}_{latent_name}.mp4', images, fps=20) 
             print(f"{args.outdir}/{latent_index:02d}_{latent_name}.mp4")
