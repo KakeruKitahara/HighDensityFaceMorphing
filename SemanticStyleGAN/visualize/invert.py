@@ -98,6 +98,7 @@ def optimize_latent(args, g_ema, target_img_tensor):
 
         pbar.set_description(f'perc: {p_loss.item():.4f} noise: {n_loss.item():.4f} mse: {mse_loss.item():.4f}  latent: {latent_mean_loss.item():.4f}')
 
+
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -150,7 +151,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_noises', type=parse_boolean, default=True)
     parser.add_argument('--w_plus', type=parse_boolean, default=True, help='optimize in w+ space, otherwise w space')
 
-    parser.add_argument('--save_steps', type=parse_boolean, default=False, help='if to save intermediate optimization results')
+    parser.add_argument('--save_steps', type=parse_boolean, default=True, help='if to save intermediate optimization results')
 
     parser.add_argument('--truncation', type=float, default=1, help='truncation tricky, trade-off between quality and diversity')
 

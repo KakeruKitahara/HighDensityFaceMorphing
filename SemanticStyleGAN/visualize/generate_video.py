@@ -120,5 +120,5 @@ if __name__ == '__main__':
             images, segs = generate(model, styles_new, mean_latent=mean_latent, 
                         randomize_noise=False, batch_size=args.batch)
             frames = [np.concatenate((img,seg),1) for (img,seg) in zip(images,segs)]
-            imageio.mimwrite(f'{args.outdir}/{latent_index:02d}_{latent_name}.mp4', images, fps=20) 
+            imageio.mimwrite(f'{args.outdir}/{latent_index:02d}_{latent_name}.mp4', frames, fps=20) 
             print(f"{args.outdir}/{latent_index:02d}_{latent_name}.mp4")

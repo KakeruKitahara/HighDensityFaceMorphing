@@ -85,3 +85,5 @@ def tensor2image(tensor):
     images = images.astype(np.uint8)
     return images
 ```
+
+finetuningは200-400であればいい？100だめ．100x2もだめ

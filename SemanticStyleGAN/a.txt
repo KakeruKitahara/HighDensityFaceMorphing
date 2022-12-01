@@ -2,4 +2,8 @@ PYTHONPATH=.:$PYTHONPATH python visualize/generate.py pretrained/CelebAMask-HQ-5
 PYTHONPATH=.:$PYTHONPATH python visualize/generate_video.py pretrained/CelebAMask-HQ-512x512.pt --outdir results/interpolation --latent results/samples/000000_latent.npy
 PYTHONPATH=.:$PYTHONPATH python visualize/generate_components.py pretrained/CelebAMask-HQ-512x512.pt --outdir results/components --latent results/samples/000000_latent.npy
 PYTHONPATH=.:$PYTHONPATH python visualize/invert.py --ckpt pretrained/CelebAMask-HQ-512x512.pt --imgdir images --outdir results/inversion --size 512 --finetune_step 400
+PYTHONPATH=.:$PYTHONPATH python visualize/generate_morph.py results/inversion/weights/AN.pt --outdir results/interpolation --latent_start results/inversion/latent/AN.npy --latent_end results/inversion/latent/FE.npy
+
+
+PYTHONPATH=.:$PYTHONPATH python visualize/generate_components.py pretrained/AN-FE.pt  --outdir results/components --latent results/inversion/latent/FE.npy
 conv2dでエラーが出るが気にしなくていい．
