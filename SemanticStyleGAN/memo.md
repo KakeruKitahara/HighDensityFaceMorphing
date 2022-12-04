@@ -87,3 +87,28 @@ def tensor2image(tensor):
 ```
 
 finetuningは200-400であればいい？100だめ．100x2もだめ
+
+'''
+    def composite(self, feats, depths, mask=None): # depthsはtensorのlist．[1, 1, 64, 64] x 13,  featsはtensorのlist [1, 512, 64, 64] x 13
+        seg = F.softmax(torch.cat(depths, dim=1), dim=1) # [1, 13, 64, 64] -> [1, 13, 64, 64] , softmaxなのでe^xの比となる．
+        if mask is not None:
+            # If mask is given, ignore specified classes
+            assert mask.size(0) == seg.size(0)
+            assert mask.size(1) == seg.size(1)
+            mask = mask.reshape(seg.size(0), mask.size(1), 1, 1) # [1, 13, 1, 1]
+            seg = seg * mask # [1, 13, 64, 64]
+            seg = seg / (seg.sum(1, keepdim=True)+1e-8) # 13の列で総和．1e-8は0除算を防ぐ [1, 1, 64, 64] -> 正規化
+        if len(self.transparent_dims) > 0:
+            coefs = torch.tensor([0. if i in self.transparent_dims else 1. for i in range(self.seg_dim)]).view(1,-1,1,1).to(seg.device) # coefs : 係数 [1, 13, 1, 1] transparent_dimsで指定された添字は1それ以外は0となる．seg_dimは13
+            seg_normal = seg * coefs # zero out transparent classes
+            seg_normal = seg_normal / (seg_normal.sum(1, keepdim=True)+1e-8)  # re-normalize the feature map
+
+            coefs = torch.tensor([1. if i in self.transparent_dims else 0. for i in range(self.seg_dim)]).view(1,-1,1,1).to(seg.device) # coefs : 上の反転係数
+            seg_trans = seg * coefs # zero out non-transparent classes
+
+            weights = seg_normal + seg_trans # weightはsegのマスクなし正規化
+        else:
+            weights = seg
+        feat = sum([feats[i]*weights[:,i:i+1] for i in range(self.seg_dim)]) # 13足し合わせる．
+        return feat, seg
+'''

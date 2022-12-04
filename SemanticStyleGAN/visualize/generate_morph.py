@@ -17,17 +17,15 @@
 
 import os
 import argparse
-import shutil
 import numpy as np
 import imageio
 import torch
-from visualize.utils import tensor2image, tensor2seg
-
+from tqdm import tqdm
 from models import make_model
-from visualize.utils import generate, cubic_spline_interpolate
+from visualize.utils import mask_generate
 
 latent_dict_celeba = {
-    2:  "bcg_1", # 背景
+    2:  "bcg_1",
     3:  "bcg_2",
     4:  "face_shape",
     5:  "face_texture",
@@ -50,12 +48,13 @@ latent_dict_celeba = {
     22: "glass",
     24: "hat",
     26: "earing",
-    0:  "coarse_1", # 顔の輪郭，位置関係
+    0:  "coarse_1",
     1:  "coarse_2",
 }
 
-if __name__ == '__main__':
 
+
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('ckpt', type=str, help="path to the model checkpoint")
@@ -67,25 +66,16 @@ if __name__ == '__main__':
                         help="path to the output directory")
     parser.add_argument('--batch', type=int, default=8,
                         help="batch size for inference")
-    parser.add_argument("--sample", type=int, default=10,
-                        help="number of latent samples to be interpolated")
-    parser.add_argument("--steps", type=int, default=160,
+    parser.add_argument("--step", type=int, default=60,
                         help="number of latent steps for interpolation")
-    parser.add_argument("--truncation", type=float,
-                        default=0.7, help="truncation ratio")
-    parser.add_argument("--truncation_mean", type=int, default=10000,
-                        help="number of vectors to calculate mean for the truncation")
+    parser.add_argument("--fps", type=int, default=30,
+                        help="number of fps of morphing")
     parser.add_argument("--dataset_name", type=str, default="celeba",
                         help="used for finding mapping between latent indices and names")
     parser.add_argument('--device', type=str, default="cuda",
                         help="running device for inference")
-    parser.add_argument('--enc', type=str, default="mp4",
-                        help="output exstension, [mp4], [gif] or [png]", choices=['mp4', 'gif', 'png'])
-    args = parser.parse_args()
 
-    if os.path.exists(args.outdir):
-        shutil.rmtree(args.outdir)
-    os.makedirs(args.outdir)
+    args = parser.parse_args()
 
     print("Loading model ...")
     ckpt = torch.load(args.ckpt)
@@ -93,8 +83,6 @@ if __name__ == '__main__':
     model.to(args.device)
     model.eval()
     model.load_state_dict(ckpt['g_ema'])
-    mean_latent = model.style(torch.randn(
-        args.truncation_mean, model.style_dim, device=args.device)).mean(0)
 
     print("Generating original image ...")
     with torch.no_grad():
@@ -111,45 +99,48 @@ if __name__ == '__main__':
             styles_start = styles_start.unsqueeze(
                 1).repeat(1, model.n_latent, 1)
             styles_end = styles_end.unsqueeze(1).repeat(1, model.n_latent, 1)
-        images_start, segs_start = generate(
-            model, styles_start, randomize_noise=False)
-        images_end, segs_end = generate(
-            model, styles_end, randomize_noise=False)
-        imageio.imwrite(f'{args.outdir}/image_start.jpeg', images_start[0])
-        imageio.imwrite(f'{args.outdir}/seg_start.jpeg', segs_start[0])
-        imageio.imwrite(f'{args.outdir}/image_end.jpeg', images_end[0])
-        imageio.imwrite(f'{args.outdir}/seg_end.jpeg', segs_end[0])
 
-    print("Generating videos ...")
+    filename_start = os.path.splitext(os.path.basename(args.latent_start))[0]
+    filename_end = os.path.splitext(os.path.basename(args.latent_end))[0]
+    movie_path = f'{args.outdir}/movie/{filename_start}_{filename_end}'
+    flip_path = f'{args.outdir}/flip/{filename_start}_{filename_end}'
+    os.makedirs(movie_path, exist_ok=True)
+    os.makedirs(flip_path, exist_ok=True)
+    
+    print(f'Generating morphing {filename_start} -> {filename_end}')
     if args.dataset_name == "celeba":
         latent_dict = latent_dict_celeba
     else:
         raise ValueError("Unknown dataset name: f{args.dataset_name}")
 
     with torch.no_grad():
-        np.set_printoptions(threshold=30)
-        itr = 30
+        itr = args.step
         stnum = styles_start.detach().cpu().numpy()
         _, b, c = stnum.shape
         styles_new = torch.empty((itr, b, c), device=args.device)
-        for i in range(itr):
+        composition_mask = torch.zeros(1, model.n_local, device=args.device)
+        composition_mask[:,0:6] = 1 # 1:face, 2:eye, 3:eyebrow, 4:mouth, 5:nose, 6:ear, 7:hair, 8:neck, 9:cloth
+        for i in tqdm(range(itr)):
             alpha = (1/(itr-1))*i
-            print(alpha, i)
-            for latent_index, latent_name in latent_dict.items():
-                if latent_index <= 15 : 
-                    tmp = alpha*styles_start[:, latent_index]+(1-alpha)*styles_end[:, latent_index]
+            for latent_index, _ in latent_dict.items():
+                if latent_index <= 15:
+                    tmp = (1-alpha) * styles_start[:, latent_index] + alpha * styles_end[:, latent_index]
                     styles_new[i, latent_index] = tmp
-                else :
+                else:
                     styles_new[i, latent_index] = styles_start[:, latent_index]
-                
+
             style_image = torch.unsqueeze(styles_new[i], dim=0)
-            image, _ = generate(model, style_image, randomize_noise=False)
-        
-            imageio.imwrite(f'{args.outdir}/{i}.png', image[0])
-        images, segs = generate(model, styles_new, mean_latent=mean_latent,
-                                randomize_noise=False, batch_size=args.batch)
+            image, _ = mask_generate(model, style_image, randomize_noise=False, composition_mask=composition_mask)
+
+            imageio.imwrite(f'{flip_path}/{i + 1}.png', image[0])
+        images, segs = mask_generate(model, styles_new, randomize_noise=False, batch_size=args.batch, composition_mask=composition_mask)
         frames = [np.concatenate((img, seg), 1)
-                    for (img, seg) in zip(images, segs)]
+                  for (img, seg) in zip(images, segs)]
+
+        fps = args.fps
         imageio.mimwrite(
-            f'{args.outdir}/morph.mp4', frames, fps=20)
-        print(f"{args.outdir}/morph.mp4")
+            f'{movie_path}/{filename_start}-{filename_end}.mp4', images, fps=fps)
+        imageio.mimwrite(
+            f'{movie_path}/{filename_start}-{filename_end}.gif', images, fps=fps) # 高fpsだとgifは不安定な挙動する．
+        imageio.mimwrite(
+            f'{movie_path}/{filename_start}-{filename_end}_mask.mp4', frames, fps=fps)

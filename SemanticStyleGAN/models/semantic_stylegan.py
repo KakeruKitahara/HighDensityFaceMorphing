@@ -246,18 +246,19 @@ class SemanticGenerator(nn.Module):
     def composite(self, feats, depths, mask=None):
         seg = F.softmax(torch.cat(depths, dim=1), dim=1)
         if mask is not None:
+            mask = mask.repeat(seg.size(0), 1)
             # If mask is given, ignore specified classes
             assert mask.size(0) == seg.size(0)
             assert mask.size(1) == seg.size(1)
-            mask = mask.reshape(seg.size(0), seg.size(1), 1, 1)
+            mask = mask.reshape(seg.size(0), mask.size(1), 1, 1) # [1, 13, 1, 1]
             seg = seg * mask
-            seg = seg / (seg.sum(1, keepdim=True)+1e-8)
+
         if len(self.transparent_dims) > 0:
             coefs = torch.tensor([0. if i in self.transparent_dims else 1. for i in range(self.seg_dim)]).view(1,-1,1,1).to(seg.device)
-            seg_normal = seg * coefs # zero out transparent classes
-            seg_normal = seg_normal / (seg_normal.sum(1, keepdim=True)+1e-8)  # re-normalize the feature map
+            seg_normal = seg * coefs
+            seg_normal = seg_normal / (seg_normal.sum(1, keepdim=True)+1e-8)
 
-            coefs = torch.tensor([1. if i in self.transparent_dims else 0. for i in range(self.seg_dim)]).view(1,-1,1,1).to(seg.device)
+            coefs = torch.tensor([1. if i in self.transparent_dims else 0. for i in range(self.seg_dim)]).view(1,-1,1,1).to(seg.device) # coefs : 上の反転係数
             seg_trans = seg * coefs # zero out non-transparent classes
 
             weights = seg_normal + seg_trans
