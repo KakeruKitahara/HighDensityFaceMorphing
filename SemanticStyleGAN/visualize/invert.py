@@ -151,7 +151,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_noises', type=parse_boolean, default=True)
     parser.add_argument('--w_plus', type=parse_boolean, default=True, help='optimize in w+ space, otherwise w space')
 
-    parser.add_argument('--save_steps', type=parse_boolean, default=True, help='if to save intermediate optimization results')
+    parser.add_argument('--save_steps', type=parse_boolean, default=False, help='if to save intermediate optimization results')
 
     parser.add_argument('--truncation', type=float, default=1, help='truncation tricky, trade-off between quality and diversity')
 
@@ -163,6 +163,7 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_mse', type=float, default=0.1)
     parser.add_argument('--lambda_lpips', type=float, default=1.0)
     parser.add_argument('--lambda_mean', type=float, default=1.0)
+    parser.add_argument('--original_ckpt_path', type=str, default='pretrained/CelebAMask-HQ-512x512.pt', help='name of the trained model before fine tuning')
 
     args = parser.parse_args()
     print(args)
@@ -178,9 +179,7 @@ if __name__ == '__main__':
     
 
     img_list = sorted(os.listdir(args.imgdir))
-    if os.path.exists(args.outdir):
-        shutil.rmtree(args.outdir)
-    os.makedirs(os.path.join(args.outdir, 'recon'), exist_ok=True)
+    # os.makedirs(os.path.join(args.outdir, 'recon'), exist_ok=True)
     if args.finetune_step > 0:
         os.makedirs(os.path.join(args.outdir, 'recon_finetune'), exist_ok=True)
     if args.save_steps:
@@ -195,6 +194,17 @@ if __name__ == '__main__':
     transform = get_transformation(args)
 
     for image_name in img_list:
+        
+        image_basename = os.path.splitext(image_name)[0]
+        ckpt_basename = os.path.splitext(os.path.basename(args.ckpt))[0]
+        print(f'model: {ckpt_basename}, image: {image_basename}')
+        if image_basename == ckpt_basename : 
+            print("same skip")
+            continue
+        if os.path.exists(os.path.join('pretrained/', f'{ckpt_basename}-{image_basename}.pt')) : 
+            print("inverse skip")
+            continue
+
         img_path = os.path.join(args.imgdir, image_name)
 
         # Reload the model
@@ -212,12 +222,16 @@ if __name__ == '__main__':
         with torch.no_grad():
             img_gen, _ = g_ema([latent_path[-1]], input_is_latent=True, randomize_noise=False, noise=noises)
             img_gen = tensor2image(img_gen).squeeze()
-            imwrite(os.path.join(args.outdir, 'recon/', image_name), img_gen)
+            # imwrite(os.path.join(args.outdir, 'recon/', image_name), img_gen)
             
             # Latents
-            image_basename = os.path.splitext(image_name)[0]
             latent_np = latent_path[-1].detach().cpu().numpy()
-            np.save(os.path.join(args.outdir, 'latent/', f'{image_basename}.npy'), latent_np)
+            if args.ckpt != args.original_ckpt_path :
+                npy_path = os.path.join(args.outdir, 'latent/', f'{ckpt_basename}-{image_basename}')
+                if os.path.exists(npy_path):
+                    shutil.rmtree(npy_path)
+                os.makedirs(npy_path)
+                np.save(os.path.join(npy_path, f'{image_basename}.npy'), latent_np)
             if not args.no_noises:
                 noises_np = torch.stack(noises, dim=1).detach().cpu().numpy()
                 np.save(os.path.join(args.outdir, 'noise/', f'{image_basename}.npy'), noises_np)
@@ -236,9 +250,17 @@ if __name__ == '__main__':
             with torch.no_grad():
                 img_gen, _ = g_ema([latent_path[-1]], input_is_latent=True, randomize_noise=False, noise=noises)
                 img_gen = tensor2image(img_gen).squeeze()
-                imwrite(os.path.join(args.outdir, 'recon_finetune/', image_name), img_gen)
+                if args.ckpt != args.original_ckpt_path :
+                    recon_finetune_path = os.path.join(args.outdir, 'recon_finetune/', f'{image_basename}-{ckpt_basename}')
+                    if os.path.exists(recon_finetune_path):
+                        shutil.rmtree(recon_finetune_path)
+                    os.makedirs(recon_finetune_path)
+                    imwrite(os.path.join(recon_finetune_path, image_name), img_gen)
 
                 # Weights
                 image_basename = os.path.splitext(image_name)[0]
                 ckpt_new = {"g_ema": g_ema.state_dict(), "args": ckpt["args"]}
-                torch.save(ckpt_new, os.path.join(args.outdir, 'weights/', f'{image_basename}.pt'))
+                if args.ckpt != args.original_ckpt_path :
+                    torch.save(ckpt_new, os.path.join('pretrained/', f'{image_basename}-{ckpt_basename}.pt'))
+                else : 
+                    torch.save(ckpt_new, os.path.join(args.outdir, 'weights/', f'{image_basename}.pt'))

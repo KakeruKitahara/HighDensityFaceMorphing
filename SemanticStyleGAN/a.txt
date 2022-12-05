@@ -1,9 +1,6 @@
-PYTHONPATH=.:$PYTHONPATH python visualize/generate.py pretrained/CelebAMask-HQ-512x512.pt(finetuneのpt) --outdir results/samples --sample 20 --save_latent
-PYTHONPATH=.:$PYTHONPATH python visualize/generate_video.py pretrained/CelebAMask-HQ-512x512.pt --outdir results/interpolation --latent results/samples/000000_latent.npy
-PYTHONPATH=.:$PYTHONPATH python visualize/generate_components.py pretrained/CelebAMask-HQ-512x512.pt --outdir results/components --latent results/samples/000000_latent.npy
 PYTHONPATH=.:$PYTHONPATH python visualize/invert.py --ckpt pretrained/CelebAMask-HQ-512x512.pt --imgdir images --outdir results/inversion --size 512 --finetune_step 400
-
-
 PYTHONPATH=.:$PYTHONPATH python visualize/generate_morph.py pretrained/AN-FE.pt  --outdir results/interpolation --latent_start results/inversion/latent/AN.npy --latent_end results/inversion/latent/FE.npy
-PYTHONPATH=.:$PYTHONPATH python visualize/generate_components2.py pretrained/AN-FE.pt  --outdir results/components --latent results/inversion/latent/FE.npy
-conv2dでエラーが出るが気にしなくていい．
+PYTHONPATH=.:$PYTHONPATH python visualize/generate_components.py pretrained/CelebAMask-HQ-512x512.pt --outdir results/components --latent results/samples/000000_latent.npy
+
+python visualize/generate_morph.py pretrained/DI-LFAU17.pt  --outdir results/interpolation --latent_start results/inversion/latent/DI.npy --latent_end results/inversion/latent/LFAU17.npy
+
