@@ -1,18 +1,22 @@
 import argparse
 import os
+from glob import glob
 import cv2
-from IPython.display import Image, display
 
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--indir', help='input dir')
+  args = parser.parse_args()
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--input', help='input file')
-args = parser.parse_args()
+  if args.indir is not None : 
+    path = f'{args.indir}/*.png'
+    img_list = glob(path)
+    for ol_img in img_list :
+      img = cv2.imread(ol_img)
 
-img = cv2.imread(args.input)
+      dst = cv2.resize(img, dsize=(256, 256))
+      filename = os.path.basename(ol_img)
+      print(f"{filename} : {img.shape} -> {dst.shape}")
 
-dst = cv2.resize(img, dsize=(512, 512))
-filename = os.path.basename(args.input)
-print(f"{filename} : {img.shape} -> {dst.shape}")
-
-cv2.imwrite(args.input, dst)
+      cv2.imwrite(ol_img, dst)
 

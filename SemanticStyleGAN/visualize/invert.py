@@ -16,7 +16,6 @@
 # OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import os
-import sys
 import shutil
 import math
 import argparse
@@ -197,13 +196,10 @@ if __name__ == '__main__':
         
         image_basename = os.path.splitext(image_name)[0]
         ckpt_basename = os.path.splitext(os.path.basename(args.ckpt))[0]
+        
+        if os.path.exists(os.path.join('pretrained/', f'{image_basename}-{ckpt_basename}.pt')) : 
+            continue
         print(f'model: {ckpt_basename}, image: {image_basename}')
-        if image_basename == ckpt_basename : 
-            print("same skip")
-            continue
-        if os.path.exists(os.path.join('pretrained/', f'{ckpt_basename}-{image_basename}.pt')) : 
-            print("inverse skip")
-            continue
 
         img_path = os.path.join(args.imgdir, image_name)
 
@@ -222,15 +218,16 @@ if __name__ == '__main__':
         with torch.no_grad():
             img_gen, _ = g_ema([latent_path[-1]], input_is_latent=True, randomize_noise=False, noise=noises)
             img_gen = tensor2image(img_gen).squeeze()
-            # imwrite(os.path.join(args.outdir, 'recon/', image_name), img_gen)
+            if image_basename == ckpt_basename : 
+                recon_finetune_path = os.path.join(args.outdir, 'recon_finetune/', f'{ckpt_basename}-{image_basename}')
+                os.makedirs(recon_finetune_path, exist_ok=True)
+                imwrite(os.path.join(recon_finetune_path, image_name), img_gen)
             
             # Latents
             latent_np = latent_path[-1].detach().cpu().numpy()
             if args.ckpt != args.original_ckpt_path :
                 npy_path = os.path.join(args.outdir, 'latent/', f'{ckpt_basename}-{image_basename}')
-                if os.path.exists(npy_path):
-                    shutil.rmtree(npy_path)
-                os.makedirs(npy_path)
+                os.makedirs(npy_path, exist_ok=True)
                 np.save(os.path.join(npy_path, f'{image_basename}.npy'), latent_np)
             if not args.no_noises:
                 noises_np = torch.stack(noises, dim=1).detach().cpu().numpy()
@@ -245,22 +242,20 @@ if __name__ == '__main__':
                     images.append(img_gen)
                 mimwrite(os.path.join(args.outdir, 'steps/', f'{image_basename}.mp4'), images, fps=10)
             
-        if args.finetune_step > 0:
+        if args.finetune_step > 0 and image_basename != ckpt_basename :
             g_ema = optimize_weights(args, g_ema, target_img_tensor, latent_path[-1], noises)
             with torch.no_grad():
                 img_gen, _ = g_ema([latent_path[-1]], input_is_latent=True, randomize_noise=False, noise=noises)
                 img_gen = tensor2image(img_gen).squeeze()
                 if args.ckpt != args.original_ckpt_path :
-                    recon_finetune_path = os.path.join(args.outdir, 'recon_finetune/', f'{image_basename}-{ckpt_basename}')
-                    if os.path.exists(recon_finetune_path):
-                        shutil.rmtree(recon_finetune_path)
-                    os.makedirs(recon_finetune_path)
+                    recon_finetune_path = os.path.join(args.outdir, 'recon_finetune/', f'{ckpt_basename}-{image_basename}')
+                    os.makedirs(recon_finetune_path, exist_ok=True)
                     imwrite(os.path.join(recon_finetune_path, image_name), img_gen)
 
                 # Weights
                 image_basename = os.path.splitext(image_name)[0]
                 ckpt_new = {"g_ema": g_ema.state_dict(), "args": ckpt["args"]}
                 if args.ckpt != args.original_ckpt_path :
-                    torch.save(ckpt_new, os.path.join('pretrained/', f'{image_basename}-{ckpt_basename}.pt'))
+                    torch.save(ckpt_new, os.path.join('pretrained/', f'{ckpt_basename}-{image_basename}.pt'))
                 else : 
                     torch.save(ckpt_new, os.path.join(args.outdir, 'weights/', f'{image_basename}.pt'))
