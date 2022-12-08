@@ -16,7 +16,6 @@
 # OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import os
-import sys
 import shutil
 import math
 import argparse
@@ -30,7 +29,7 @@ from torch import optim
 import torch.nn.functional as F
 from torchvision import transforms
 
-from criteria import lpips
+from criteria.lpips import lpips
 from models import make_model
 from visualize.utils import tensor2image, tensor2seg
 
@@ -56,7 +55,7 @@ def calc_lpips_loss(im1, im2):
 
 def optimize_latent(args, g_ema, target_img_tensor):
 
-    noises = g_ema.render_net.get_noises(noise=None, randomize_noises=False)
+    noises = g_ema.render_net.get_noise(noise=None, randomize_noise=False)
     for noise in noises:
         noise.requires_grad = True
 
@@ -81,7 +80,7 @@ def optimize_latent(args, g_ema, target_img_tensor):
         
         img_gen, _ = g_ema([latent_in], input_is_latent=True, randomize_noise=False, noise=noises)
 
-        p_loss = percept(img_gen, target_img_tensor).mean()
+        p_loss = calc_lpips_loss(img_gen, target_img_tensor)
         mse_loss = F.mse_loss(img_gen, target_img_tensor)
         n_loss = torch.mean(torch.stack([noise.pow(2).mean() for noise in noises]))
 
@@ -98,6 +97,7 @@ def optimize_latent(args, g_ema, target_img_tensor):
 
         pbar.set_description(f'perc: {p_loss.item():.4f} noise: {n_loss.item():.4f} mse: {mse_loss.item():.4f}  latent: {latent_mean_loss.item():.4f}')
 
+
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -112,15 +112,13 @@ def optimize_weights(args, g_ema, target_img_tensor, latent_in, noises=None):
 
     for p in g_ema.parameters():
         p.requires_grad = True
-    optimizer = optim.Adam(g_ema.local_nets.parameters(), lr=args.lr_g)
+    optimizer = optim.Adam(g_ema.parameters(), lr=args.lr_g)
 
     pbar = tqdm(range(args.finetune_step))
-    for i in pbar:
-        optimizer.param_groups[0]['lr'] = get_lr(float(i)/args.finetune_step, args.lr_g)
-        
+    for i in pbar:        
         img_gen, _ = g_ema([latent_in], input_is_latent=True, randomize_noise=False, noise=noises)
 
-        p_loss = percept(img_gen, target_img_tensor).mean()
+        p_loss = calc_lpips_loss(img_gen, target_img_tensor)
         mse_loss = F.mse_loss(img_gen, target_img_tensor)
 
         # main loss function
@@ -157,13 +155,14 @@ if __name__ == '__main__':
     parser.add_argument('--truncation', type=float, default=1, help='truncation tricky, trade-off between quality and diversity')
 
     parser.add_argument('--lr', type=float, default=0.1)
-    parser.add_argument('--lr_g', type=float, default=0.01)
-    parser.add_argument('--step', type=int, default=400, help='optimization steps [100-500 should give good results]')
-    parser.add_argument('--finetune_step', type=int, default=0, help='optimization steps after which to add nose')
+    parser.add_argument('--lr_g', type=float, default=1e-4)
+    parser.add_argument('--step', type=int, default=400, help='latent optimization steps')
+    parser.add_argument('--finetune_step', type=int, default=0, help='pivotal tuning inversion (PTI) steps (200-400 should give good result)')
     parser.add_argument('--noise_regularize', type=float, default=10)
     parser.add_argument('--lambda_mse', type=float, default=0.1)
     parser.add_argument('--lambda_lpips', type=float, default=1.0)
     parser.add_argument('--lambda_mean', type=float, default=1.0)
+    parser.add_argument('--original_ckpt_path', type=str, default='pretrained/CelebAMask-HQ-512x512.pt', help='name of the trained model before fine tuning')
 
     args = parser.parse_args()
     print(args)
@@ -171,20 +170,15 @@ if __name__ == '__main__':
     print("Loading model ...")
     ckpt = torch.load(args.ckpt)
     g_ema = make_model(ckpt['args'])
-    g_ema.to(args.device)
+    g_ema.to(device)
     g_ema.eval()
     g_ema.load_state_dict(ckpt['g_ema'])
-    g_ema = g_ema.style(torch.randn(args.truncation_mean, g_ema.style_dim, device=device)).mean(0)
 
-    percept = lpips.PerceptualLoss(
-        model='net-lin', net='vgg', use_gpu=device.startswith('cuda')
-    ).to(device)
+    percept = lpips.LPIPS(net_type='vgg').to(device)
     
 
     img_list = sorted(os.listdir(args.imgdir))
-    if os.path.exists(args.outdir):
-        shutil.rmtree(args.outdir)
-    os.makedirs(os.path.join(args.outdir, 'recon'), exist_ok=True)
+    # os.makedirs(os.path.join(args.outdir, 'recon'), exist_ok=True)
     if args.finetune_step > 0:
         os.makedirs(os.path.join(args.outdir, 'recon_finetune'), exist_ok=True)
     if args.save_steps:
@@ -196,10 +190,17 @@ if __name__ == '__main__':
     if args.finetune_step > 0:
         os.makedirs(os.path.join(args.outdir, 'weights'), exist_ok=True)
 
-    resize = min(args.size, 256)
     transform = get_transformation(args)
 
     for image_name in img_list:
+        
+        image_basename = os.path.splitext(image_name)[0]
+        ckpt_basename = os.path.splitext(os.path.basename(args.ckpt))[0]
+        
+        if os.path.exists(os.path.join('pretrained/', f'{image_basename}-{ckpt_basename}.pt')) : 
+            continue
+        print(f'model: {ckpt_basename}, image: {image_basename}')
+
         img_path = os.path.join(args.imgdir, image_name)
 
         # Reload the model
@@ -217,12 +218,20 @@ if __name__ == '__main__':
         with torch.no_grad():
             img_gen, _ = g_ema([latent_path[-1]], input_is_latent=True, randomize_noise=False, noise=noises)
             img_gen = tensor2image(img_gen).squeeze()
-            imwrite(os.path.join(args.outdir, 'recon/', image_name), img_gen)
+            if image_basename == ckpt_basename : 
+                recon_finetune_path = os.path.join(args.outdir, 'recon_finetune/', f'{ckpt_basename}-{image_basename}')
+                os.makedirs(recon_finetune_path, exist_ok=True)
+                imwrite(os.path.join(recon_finetune_path, image_name), img_gen)
             
             # Latents
-            image_basename = os.path.splitext(image_name)[0]
             latent_np = latent_path[-1].detach().cpu().numpy()
-            np.save(os.path.join(args.outdir, 'latent/', f'{image_basename}.npy'), latent_np)
+            npy_path = os.path.join(args.outdir, 'latent/')
+            if args.ckpt != args.original_ckpt_path :
+                npy_path = os.path.join(npy_path, f'{ckpt_basename}-{image_basename}')
+            os.makedirs(npy_path, exist_ok=True)
+            np.save(os.path.join(npy_path, f'{image_basename}.npy'), latent_np)
+            
+            
             if not args.no_noises:
                 noises_np = torch.stack(noises, dim=1).detach().cpu().numpy()
                 np.save(os.path.join(args.outdir, 'noise/', f'{image_basename}.npy'), noises_np)
@@ -235,14 +244,21 @@ if __name__ == '__main__':
                     img_gen = tensor2image(img_gen).squeeze()
                     images.append(img_gen)
                 mimwrite(os.path.join(args.outdir, 'steps/', f'{image_basename}.mp4'), images, fps=10)
-
-        if args.finetune_step > 0:
+            
+        if args.finetune_step > 0 and image_basename != ckpt_basename :
             g_ema = optimize_weights(args, g_ema, target_img_tensor, latent_path[-1], noises)
             with torch.no_grad():
                 img_gen, _ = g_ema([latent_path[-1]], input_is_latent=True, randomize_noise=False, noise=noises)
                 img_gen = tensor2image(img_gen).squeeze()
-                imwrite(os.path.join(args.outdir, 'recon_finetune/', image_name), img_gen)
+                if args.ckpt != args.original_ckpt_path :
+                    recon_finetune_path = os.path.join(args.outdir, 'recon_finetune/', f'{ckpt_basename}-{image_basename}')
+                    os.makedirs(recon_finetune_path, exist_ok=True)
+                    imwrite(os.path.join(recon_finetune_path, image_name), img_gen)
 
                 # Weights
                 image_basename = os.path.splitext(image_name)[0]
-                torch.save(g_ema.state_dict(), os.path.join(args.outdir, 'weights/', f'{image_basename}.pt'))
+                ckpt_new = {"g_ema": g_ema.state_dict(), "args": ckpt["args"]}
+                if args.ckpt != args.original_ckpt_path :
+                    torch.save(ckpt_new, os.path.join('pretrained/', f'{ckpt_basename}-{image_basename}.pt'))
+                else : 
+                    torch.save(ckpt_new, os.path.join(args.outdir, 'weights/', f'{image_basename}.pt'))

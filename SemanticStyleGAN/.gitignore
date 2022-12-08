@@ -130,3 +130,13 @@ dmypy.json
 .pt
 .DS_Store
 data/
+
+
+# data
+
+/pretrained/*
+!/pretrained/.gitkeep
+
+/results
+/images
+memo.md

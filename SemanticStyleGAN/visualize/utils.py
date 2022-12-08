@@ -58,6 +58,17 @@ def generate(model, styles, mean_latent=None, truncation=1.0, batch_size=16, *ar
     images, segs = torch.cat(images,0), torch.cat(segs,0)
     return tensor2image(images), tensor2seg(segs)
 
+    
+def mask_generate(model, styles, composition_mask, mean_latent=None, truncation=1.0, batch_size=16, *args, **kwargs):
+    images, segs = [], []
+    for head in range(0, styles.size(0), batch_size):
+        images_, segs_ = model([styles[head:head+batch_size]], input_is_latent=True, composition_mask=composition_mask, 
+                                    truncation=truncation, truncation_latent=mean_latent, *args, **kwargs)
+        images.append(images_.detach().cpu())
+        segs.append(segs_.detach().cpu())
+    images, segs = torch.cat(images,0), torch.cat(segs,0)
+    return tensor2image(images), tensor2seg(segs)
+
 def tensor2image(tensor):
     images = tensor.cpu().clamp(-1,1).permute(0,2,3,1).numpy()
     images = images * 127.5 + 127.5
