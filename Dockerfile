@@ -1,34 +1,37 @@
-FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
+FROM nvidia/cuda:11.2.0-cudnn8-devel-ubuntu18.04
 
-RUN apt-get update
-RUN apt-get install -y git \
+WORKDIR /root/work
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
   python3 \
-  python3-pip \
-  curl
-
-WORKDIR /work
-
-# SemanticStyleGANはv1.0.0 ( https://github.com/seasonSH/SemanticStyleGAN#pretrained-models )
-COPY SemanticStyleGAN/requirements.txt .
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-RUN pip install jupyterlab
-
-# 依存関係ファイルの削除
-RUN apt-get autoremove -y && apt-get clean && \
+  curl \
+  python3.7-dev \
+  libgl1-mesa-dev && \
+  apt-get install -y python3-pip && \
+  curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
+  apt-get install -y --no-install-recommends nodejs && \
+  apt-get autoremove -y && apt-get clean && \
   rm -rf /usr/local/src/*
 
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 30 && \
+  update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 30
 
-# nodejs v16 をインストール．この際にnpmもインストールされる．
-RUN curl -sL https://deb.nodesource.com/setup_16.x | bash -
-RUN apt-get install -y nodejs
+RUN update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 30 \
+  && update-alternatives --install /usr/bin/python python /usr/bin/python3 30
 
+# SemanticStyleGANはmaster ( https://github.com/seasonSH/SemanticStyleGAN#pretrained-models )
+COPY SemanticStyleGAN/requirements.txt .
 
-# 変数や行列の中身を確認
-RUN jupyter labextension install @lckr/jupyterlab_variableinspector@3.0.7
+RUN pip install --upgrade pip && \
+  pip install \
+  jupyterlab \
+  autopep8 \
+  jupyterlab_code_formatter && \
+  pip install -r requirements.txt && \
+  rm -rf ~/.cache/pip
 
-# 自動整形
-RUN pip install autopep8 \
-  && pip install jupyterlab_code_formatter \
-  && jupyter labextension install @ryantam626/jupyterlab_code_formatter \
-  && jupyter serverextension enable --py jupyterlab_code_formatter
+# @lckr/jupyterlab_variableinspector@3.0.7 : 自動整形，@lckr/jupyterlab_variableinspector@3.0.7 : 変数や行列の中身を確認
+RUN jupyter labextension install @lckr/jupyterlab_variableinspector@3.0.7 &&\
+  jupyter labextension install @ryantam626/jupyterlab_code_formatter &&\
+  jupyter serverextension enable --py jupyterlab_code_formatter
