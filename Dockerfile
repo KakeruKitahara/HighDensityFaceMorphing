@@ -17,9 +17,6 @@ RUN apt-get update \
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 30 && \
   update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 30
 
-RUN update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 30 \
-  && update-alternatives --install /usr/bin/python python /usr/bin/python3 30
-
 # SemanticStyleGANはmaster ( https://github.com/seasonSH/SemanticStyleGAN#pretrained-models )
 COPY SemanticStyleGAN/requirements.txt .
 
@@ -28,7 +25,7 @@ RUN pip install --upgrade pip && \
   jupyterlab \
   autopep8 \
   jupyterlab_code_formatter && \
-  pip install -r requirements.txt && \
+  pip install -r --no-cache-dir requirements.txt && \
   rm -rf ~/.cache/pip
 
 # @lckr/jupyterlab_variableinspector@3.0.7 : 自動整形，@lckr/jupyterlab_variableinspector@3.0.7 : 変数や行列の中身を確認
