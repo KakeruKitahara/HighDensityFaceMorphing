@@ -130,3 +130,31 @@ dmypy.json
 .pt
 .DS_Store
 data/
+
+
+# SemanticStyleGAN
+
+/pretrained/*
+!/pretrained/.gitkeep
+
+/results/components/*
+!/results/components/.gitkeep
+
+/results/interpolation/flip/*
+!/results/interpolation/flip/.gitkeep
+
+/results/interpolation/movie/*
+!/results/interpolation/movie/.gitkeep
+
+/root/work/results/inversion/recon_finetune/*
+!/root/work/results/inversion/recon_finetune/.gitkeep
+
+/root/work/results/inversion/weights/*
+!/root/work/results/inversion/weights/.gitkeep
+
+/images/*
+!/images/.gitkeep
+
+# images内の.gitkeepでエラー出るかも
+memo.md
+

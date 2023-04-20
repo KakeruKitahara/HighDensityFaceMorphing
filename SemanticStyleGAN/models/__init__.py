@@ -18,7 +18,7 @@
 import pprint
 from .semantic_stylegan import SemanticGenerator, DualBranchDiscriminator
 
-def make_model(args, verbose=True):
+def make_model(args, verbose=False):
     if verbose:
         print(f"Initializing model with arguments:")
         pprint.pprint(vars(args))
