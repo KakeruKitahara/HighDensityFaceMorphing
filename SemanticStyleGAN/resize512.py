@@ -14,9 +14,4 @@ if __name__ == "__main__":
     for ol_img in img_list :
       img = cv2.imread(ol_img)
 
-      dst = cv2.resize(img, dsize=(256, 256))
-      filename = os.path.basename(ol_img)
-      print(f"{filename} : {img.shape} -> {dst.shape}")
-
-      cv2.imwrite(ol_img, dst)
-
+      print(img.shape)
