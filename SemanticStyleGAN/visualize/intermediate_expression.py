@@ -111,11 +111,8 @@ if __name__ == '__main__':
         # 1:face, 2:eye, 3:eyebrow, 4:mouth, 5:nose, 6:ear, 7:hair, 8:neck, 9:cloth
         composition_mask[:, 0:6] = 1
         for latent_index, _ in latent_dict.items():
-            if latent_index <= 15:
-                tmp = 0.5 * styles_start[:, latent_index] + 0.5 * styles_end[:, latent_index]
-                styles_new[0, latent_index] = tmp
-            else:
-                styles_new[0, latent_index] = styles_start[:, latent_index]
+            tmp = 0.5 * styles_start[:, latent_index] + 0.5 * styles_end[:, latent_index]
+            styles_new[0, latent_index] = tmp
 
         style_image = torch.unsqueeze(styles_new[0], dim=0)
         image, _ = mask_generate(
