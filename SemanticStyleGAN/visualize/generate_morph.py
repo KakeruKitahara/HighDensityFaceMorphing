@@ -123,12 +123,8 @@ if __name__ == '__main__':
         for i in tqdm(range(itr)):
             alpha = (1/(itr-1))*i
             for latent_index, _ in latent_dict.items():
-                if latent_index <= 15:
-                    tmp = (1-alpha) * styles_start[:, latent_index] + alpha * styles_end[:, latent_index]
-                    styles_new[i, latent_index] = tmp
-                else:
-                    styles_new[i, latent_index] = styles_start[:, latent_index]
-
+                tmp = (1-alpha) * styles_start[:, latent_index] + alpha * styles_end[:, latent_index]
+                styles_new[i, latent_index] = tmp
             style_image = torch.unsqueeze(styles_new[i], dim=0)
             image, _ = mask_generate(model, style_image, randomize_noise=False, composition_mask=composition_mask)
 
