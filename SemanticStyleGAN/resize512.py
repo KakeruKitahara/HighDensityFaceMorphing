@@ -13,5 +13,9 @@ if __name__ == "__main__":
     img_list = glob(path)
     for ol_img in img_list :
       img = cv2.imread(ol_img)
+      img = cv2.resize(img, (512, 512))
+      if img.shape[2] == 4 :
+        img = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
 
       print(img.shape)
+      cv2.imwrite(ol_img, img)

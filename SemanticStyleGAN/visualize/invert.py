@@ -34,6 +34,7 @@ from criteria.lpips import lpips
 from models import make_model
 from visualize.utils import tensor2image, tensor2seg
 
+# cosine annealing with warm restarts
 def get_lr(t, initial_lr, rampdown=0.25, rampup=0.05):
     lr_ramp = min(1, (1 - t) / rampdown)
     lr_ramp = 0.5 - 0.5 * math.cos(lr_ramp * math.pi)
@@ -70,9 +71,9 @@ def optimize_latent(args, g_ema, target_img_tensor, name):
     latent_in.requires_grad = True
 
     if args.no_noises:
-        optimizer = optim.Adam([latent_in], lr=args.lr)
+        optimizer = optim.AdamW([latent_in], lr=args.lr)
     else:
-        optimizer = optim.Adam([latent_in] + noises, lr=args.lr)
+        optimizer = optim.AdamW([latent_in] + noises, lr=args.lr)
 
     latent_path = [latent_in.detach().clone()]
     pbar = tqdm(range(args.step))
@@ -80,7 +81,9 @@ def optimize_latent(args, g_ema, target_img_tensor, name):
     for i in pbar:
         optimizer.param_groups[0]['lr'] = get_lr(float(i)/args.step, args.lr)
         composition_mask = torch.zeros(1, g_ema.n_local, device=device)
-        composition_mask[:,:6] = 1
+
+        composition_mask[:,:6] = 1 # 髪や首は推論しない．
+
         img_gen, _ = g_ema([latent_in], input_is_latent=True, randomize_noise=False, noise=noises, composition_mask=composition_mask)
 
         p_loss = calc_lpips_loss(img_gen, target_img_tensor)
@@ -99,6 +102,10 @@ def optimize_latent(args, g_ema, target_img_tensor, name):
                 latent_mean_loss *args.lambda_mean)
 
         pbar.set_description(f'loss: {loss.item():.6f} perc: {p_loss.item():.6f}  mse: {mse_loss.item():.6f}  latent: {latent_mean_loss.item():.6f}')
+    
+        # if i % 50 == 0 :
+        #     print(f'{loss.item():.6f}, {p_loss.item():.6f}, {mse_loss.item():.6f}, {latent_mean_loss.item():.6f}')
+
 
         optimizer.zero_grad()
         loss.backward()
@@ -118,6 +125,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parse_boolean = lambda x: not x in ["False","false","0"]
     parser.add_argument('--ckpt', type=str, required=True)
+    parser.add_argument('--imgdir', type=str, required=True)
     parser.add_argument('--outdir', type=str, required=True)
 
     parser.add_argument('--size', type=int, default=256)
@@ -130,8 +138,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--truncation', type=float, default=1, help='truncation tricky, trade-off between quality and diversity')
 
-    parser.add_argument('--lr', type=float, default=0.1)
-    parser.add_argument('--lr_g', type=float, default=1e-4)
+    parser.add_argument('--lr', type=float, default=0.1, help='learning rate of optimize_latent')
+    parser.add_argument('--lr_g', type=float, default=1e-4, help='learning rate of optimize_weights')
     parser.add_argument('--step', type=int, default=400, help='latent optimization steps')
     parser.add_argument('--noise_regularize', type=float, default=10)
     parser.add_argument('--lambda_mse', type=float, default=0.1)
@@ -151,23 +159,27 @@ if __name__ == '__main__':
     percept = lpips.LPIPS(net_type='vgg').to(device)
     
 
-
-    os.makedirs(os.path.join(args.outdir, 'recon'), exist_ok=True)
-    os.makedirs(os.path.join(args.outdir, 'latent'), exist_ok=True)
-
-
     transform = get_transformation(args)
     pt_name = os.path.splitext(os.path.basename(args.ckpt))[0]
     faces = pt_name.split('-')
 
-    for fc in faces :
-        image_basename = f'images/{fc}'
-        image_name = os.path.splitext(fc)[0]
+    img_list = sorted(os.listdir(args.imgdir))
+    for image_name in img_list:
+        
+        image_basename = os.path.splitext(image_name)[0]
+        ckpt_basename = os.path.splitext(os.path.basename(args.ckpt))[0]
+        
+        if os.path.exists(os.path.join('pretrained/', f'{image_basename}-{ckpt_basename}.pt')) : 
+            continue
+        print(f'model: {ckpt_basename}, image: {image_basename}')
 
-
-        img_path =f'images/{fc}.png'
+        img_path = os.path.join(args.imgdir, image_name)
 
         # load target image
+        _, ext = os.path.splitext(img_path)
+        if ext != ".png" :
+            continue
+        
         target_pil = Image.open(img_path).resize((args.size,args.size), resample=Image.LANCZOS)
         target_img_tensor = transform(target_pil).unsqueeze(0).to(device)
 
@@ -179,15 +191,30 @@ if __name__ == '__main__':
 
             composition_mask[:,:6] = 1 # 髪や首は推論しない．
             
-            img_gen, _ = g_ema([latent_path[-1]], input_is_latent=True, randomize_noise=False, noise=noises, composition_mask=composition_mask)
-            img_gen = tensor2image(img_gen).squeeze()
-            tpl = os.path.join(args.outdir, 'recon/', pt_name)
-            os.makedirs(tpl, exist_ok=True)
-            imwrite( f'{tpl}/{image_name }.png',  img_gen)
-            
             # Latents
-            image_basename = os.path.splitext(image_name)[0]
             latent_np = latent_path[-1].detach().cpu().numpy()
-            tpl = os.path.join(args.outdir, 'latent/',pt_name)
-            os.makedirs(tpl, exist_ok=True)
-            np.save(f'{tpl}/{image_name }.npy', latent_np)
+            npy_path = os.path.join(args.outdir, 'latent/')
+            os.makedirs(npy_path, exist_ok=True)
+            np.save(os.path.join(npy_path, f'{image_basename}.npy'), latent_np)
+            
+            
+            if not args.no_noises:
+                noises_np = torch.stack(noises, dim=1).detach().cpu().numpy()
+                np.save(os.path.join(args.outdir, 'noise/', f'{image_basename}.npy'), noises_np)
+
+            if args.save_steps:
+                
+                total_steps = args.step
+                images = []
+                for i in range(0, total_steps, 10):
+                    img_gen, _ = g_ema([latent_path[i]], input_is_latent=True, randomize_noise=False, noise=noises, composition_mask=composition_mask)
+                    img_gen = tensor2image(img_gen).squeeze()
+                    images.append(img_gen)
+                steps_path = os.path.join(args.outdir, 'steps/')
+                recon_path = os.path.join(args.outdir, 'recon/')
+                os.makedirs(steps_path, exist_ok=True)
+                os.makedirs(recon_path, exist_ok=True)
+                imwrite(os.path.join(recon_path, f'{image_basename}.png'), images[-1])
+                mimwrite(os.path.join(steps_path, f'{image_basename}.mp4'), images, fps=10)
+
+            

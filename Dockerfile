@@ -6,6 +6,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
   python3 \
   curl \
+  cmake \
   python3.7-dev \
   libgl1-mesa-dev && \
   apt-get install -y python3-pip && \
