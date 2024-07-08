@@ -119,17 +119,21 @@ class RenderNet(nn.Module):
 
 
 class SemanticGenerator(nn.Module):
+
+
     def __init__(self, size=256, style_dim=512, n_mlp=8, channel_multiplier=2,
                  blur_kernel=[1, 3, 3, 1], lr_mlp=0.01, seg_dim=2,
                  coarse_size=64, min_feat_size=8, local_layers=10, local_channel=64, 
                  coarse_channel=512, base_layers=2, depth_layers=6, residual_refine=True,
-                 detach_texture=False, transparent_dims=(),
-                 **kwargs):
+                 detach_texture=False, transparent_dims=(),device0='cuda:0', device1='cuda:1',
+                 **kwargs,):
         super().__init__()
 
         assert depth_layers <= local_layers
         assert coarse_size < size
         assert min_feat_size < coarse_size and coarse_size % min_feat_size == 0
+        self.device0 = device0
+        self.device1 = device1
         self.size = size
         self.style_dim = style_dim
         self.log_size = int(math.log(size, 2))
@@ -148,15 +152,16 @@ class SemanticGenerator(nn.Module):
         self.n_latent_expand = self.n_local * self.local_layers # Expanded latent space
         print(f"n_latent: {self.n_latent}, n_latent_expand: {self.n_latent_expand}")
 
-        self.pos_embed = PositionEmbedding(2, self.local_channel, N_freqs=self.log_size)
+        self.pos_embed = PositionEmbedding(2, self.local_channel, N_freqs=self.log_size).to(self.device0)
+
         self.local_nets = nn.ModuleList()
         for i in range(0, self.n_local):
             use_depth = i > 0 # disable pseudo-depth for background generator
             self.local_nets.append(LocalGenerator(local_channel, coarse_channel, local_channel, style_dim, 
-                n_layers=local_layers, depth_layers=depth_layers, use_depth=use_depth, detach_texture=detach_texture))
+                n_layers=local_layers, depth_layers=depth_layers, use_depth=use_depth, detach_texture=detach_texture).to(self.device0))
 
         self.render_net = RenderNet(min_feat_size, size, coarse_size, coarse_channel, 3, seg_dim, style_dim,
-                channel_multiplier=channel_multiplier, blur_kernel=blur_kernel)
+                channel_multiplier=channel_multiplier, blur_kernel=blur_kernel).to(self.device1)
 
         layers = [PixelNorm()]
         for i in range(n_mlp):
@@ -164,7 +169,7 @@ class SemanticGenerator(nn.Module):
                 EqualLinear(style_dim, style_dim, 
                     lr_mul=lr_mlp, activation='fused_lrelu')
             )
-        self.style = nn.Sequential(*layers)
+        self.style = nn.Sequential(*layers).to(self.device0)
 
 
     def truncate_styles(self, styles, truncation, truncation_latent):
@@ -289,8 +294,10 @@ class SemanticGenerator(nn.Module):
         if not input_is_latent:
             latent = [self.style(s) for s in latent]
 
+        
         latent = self.truncate_styles(latent, truncation, truncation_latent)
         latent = self.mix_styles(latent) # expanded latent code
+        
 
         # Position Embedding
         if coords is None:
@@ -312,7 +319,7 @@ class SemanticGenerator(nn.Module):
         seg_coarse = 2*seg_coarse-1 # normalize to [-1,1]
 
         skip_seg = seg_coarse if self.residual_refine else None
-        rgb, seg = self.render_net(feat, noise=noise, randomize_noise=randomize_noise, skip_rgb=None, skip_seg=skip_seg)
+        rgb, seg = self.render_net(feat.to(self.device1), noise=noise, randomize_noise=randomize_noise, skip_rgb=None, skip_seg=skip_seg.to(self.device1))
 
         if return_latents:
             return rgb, latent
@@ -324,6 +331,7 @@ class SemanticGenerator(nn.Module):
             return rgb, seg
 
 
+# finetuneでは使わない．
 class DualBranchDiscriminator(nn.Module):
     def __init__(self, img_size, seg_size, img_dim, seg_dim, channel_multiplier=2, blur_kernel=[1, 3, 3, 1]):
         super().__init__()

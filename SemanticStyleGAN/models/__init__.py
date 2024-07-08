@@ -18,7 +18,7 @@
 import pprint
 from .semantic_stylegan import SemanticGenerator, DualBranchDiscriminator
 
-def make_model(args, verbose=False):
+def make_model(args, device0, device1, verbose=False,):
     if verbose:
         print(f"Initializing model with arguments:")
         pprint.pprint(vars(args))
@@ -28,5 +28,5 @@ def make_model(args, verbose=False):
         base_layers=args.base_layers, depth_layers=args.depth_layers,
         coarse_size=args.coarse_size, coarse_channel=args.coarse_channel, min_feat_size=args.min_feat_size, 
         residual_refine=args.residual_refine, detach_texture=args.detach_texture,
-        transparent_dims=args.transparent_dims)
+        transparent_dims=args.transparent_dims, device0=device0, device1=device1)
     return model
