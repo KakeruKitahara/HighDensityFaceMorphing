@@ -14,11 +14,10 @@
 |   |-- generate_components.py* : 作成したモーフィングをパーツ分け（スペクトル化）
 |   |-- generate_morph.py* : 潜在変数からモーフィング作成
 |   |-- intermediate_expression.py* : 潜在変数のモーフィング 
-|   `-- invert.py : 画像から潜在変数へ変換する
+|   `-- invert_pti.py : 画像から潜在変数へ変換する
 |-- components_display.py* : -> generate_components.py
 |-- main.ipynb* : 本研究のnote
 |-- morphing.py* : -> generate_morph.py
-|-- pair_inverting.py* : -> invert.py
 |-- prepare_image_data.py*
 |-- prepare_inception.py*
 |-- prepare_mask_data.py* 

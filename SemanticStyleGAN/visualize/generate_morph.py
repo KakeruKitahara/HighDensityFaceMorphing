@@ -55,9 +55,11 @@ latent_dict_celeba = {
 
 
 if __name__ == '__main__':
+    device0 = 'cuda:0'
+    device1 = 'cuda:1'
+    
     parser = argparse.ArgumentParser()
-
-    parser.add_argument('ckpt', type=str, help="path to the model checkpoint")
+    parser.add_argument('--ckpt', type=str, help="path to the model checkpoint")
     parser.add_argument('--latent_start', type=str, default=None,
                         help="path to the starting latent numpy")
     parser.add_argument('--latent_end', type=str, default=None,
@@ -72,15 +74,12 @@ if __name__ == '__main__':
                         help="number of fps of morphing")
     parser.add_argument("--dataset_name", type=str, default="celeba",
                         help="used for finding mapping between latent indices and names")
-    parser.add_argument('--device', type=str, default="cuda",
-                        help="running device for inference")
 
     args = parser.parse_args()
 
     print("Loading model ...")
     ckpt = torch.load(args.ckpt)
-    model = make_model(ckpt['args'])
-    model.to(args.device)
+    model = make_model(ckpt['args'], device0=device0, device1=device1)
     model.eval()
     model.load_state_dict(ckpt['g_ema'])
 
@@ -90,9 +89,9 @@ if __name__ == '__main__':
             raise Exception('Error!')
         else:
             styles_start = torch.tensor(
-                np.load(args.latent_start), device=args.device)
+                np.load(args.latent_start), device=device0)
             styles_end = torch.tensor(
-                np.load(args.latent_end), device=args.device)
+                np.load(args.latent_end), device=device0)
         if styles_start.ndim == 2 and styles_end.ndim == 2:
             assert styles_start.size(1) == model.style_dim
             assert styles_end.size(1) == model.style_dim
@@ -117,9 +116,9 @@ if __name__ == '__main__':
         itr = args.step
         stnum = styles_start.detach().cpu().numpy()
         _, b, c = stnum.shape
-        styles_new = torch.empty((itr, b, c), device=args.device)
-        composition_mask = torch.zeros(1, model.n_local, device=args.device)
-        composition_mask[:,0:6] = 1 # 1:face, 2:eye, 3:eyebrow, 4:mouth, 5:nose, 6:ear, 7:hair, 8:neck, 9:cloth
+        styles_new = torch.empty((itr, b, c), device=device0)
+        composition_mask = torch.zeros(1, model.n_local, device=device0)
+        composition_mask[:,0:6] = 1
         for i in tqdm(range(itr)):
             alpha = (1/(itr-1))*i
             for latent_index, _ in latent_dict.items():
@@ -137,6 +136,6 @@ if __name__ == '__main__':
         imageio.mimwrite(
             f'{movie_path}/{filename_start}-{filename_end}.mp4', images, fps=fps)
         imageio.mimwrite(
-            f'{movie_path}/{filename_start}-{filename_end}.gif', images, fps=fps) # 高fpsだとgifは不安定な挙動する．
+            f'{movie_path}/{filename_start}-{filename_end}.gif', images, fps=fps)
         imageio.mimwrite(
             f'{movie_path}/{filename_start}-{filename_end}_mask.mp4', frames, fps=fps)

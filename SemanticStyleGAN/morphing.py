@@ -2,20 +2,17 @@ import subprocess
 from glob import glob
 import os
 
+pt = 'pretrained/pti.pt'
+latent_path = 'results/inversion/latent'
+print(pt)
 
-original_model_path = 'pretrained/CelebAMask-HQ-512x512.pt'
-latent_path = 'results/inversion/latent/'
+path = 'images/*.png'
+img_list = sorted(glob(path))
 
-path = 'pretrained/*.pt'
-pt_list = glob(path)
-
-for pt in pt_list :
-  if original_model_path == pt :
-    continue
-  pair_name = os.path.splitext(os.path.basename(pt))[0]
-  npt_list = glob(f'results/inversion/latent/{pair_name}/*.npy')
-  if npt_list[1] == f'results/inversion/latent/{pair_name}/SA.npy' : 
-    npt_list[0], npt_list[1] = npt_list[1], npt_list[0]
-  print(f'Morphing {pair_name}')
-  cmd1 = f'PYTHONPATH=.:$PYTHONPATH python visualize/generate_morph.py {pt}  --outdir results/interpolation --latent_start {npt_list[0]} --latent_end {npt_list[1]} --step 100'
-  subprocess.run(cmd1, shell=True, check=True)
+for st_path in img_list:
+  for ed_path in img_list:
+    if st_path < ed_path :
+      st_name = os.path.splitext(os.path.basename(st_path))[0]
+      ed_name = os.path.splitext(os.path.basename(ed_path))[0]
+      cmd = f'PYTHONPATH=.:$PYTHONPATH python visualize/generate_morph.py --ckpt {pt}  --outdir results/interpolation/ --latent_start {latent_path}/{st_name}.npy --latent_end {latent_path}/{ed_name}.npy --step 100'
+      subprocess.run(cmd, shell=True, check=True)

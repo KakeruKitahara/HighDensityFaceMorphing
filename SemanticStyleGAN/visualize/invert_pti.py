@@ -109,7 +109,6 @@ def optimize_latent(args, g_ema, target_img_tensor):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        # noise_normalize_(noises)
         latent_path.append(latent_in.detach().clone())
 
     return latent_path, noises
@@ -187,6 +186,12 @@ def optimize_pti(args, g_ema, target_img_tensor_array, latent_in_array, noises_a
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        
+        if (not i % 100) and args.save_pt_step :
+            with torch.no_grad():
+                image_basename = os.path.splitext(image_name)[0]
+                ckpt_new = {"g_ema": g_ema.state_dict(), "args": ckpt["args"]}
+                torch.save(ckpt_new, os.path.join(args.outdir, 'weights/', f'pti_{i}.pt'))
 
     return g_ema
 
@@ -232,6 +237,7 @@ if __name__ == '__main__':
     parser.add_argument('--r_size', type=int, default=10)
 
     parser.add_argument('--exist_latent', type=parse_boolean, default=False)
+    parser.add_argument('--save_pt_step', type=parse_boolean, default=False)
 
     args = parser.parse_args()
     print(args)
