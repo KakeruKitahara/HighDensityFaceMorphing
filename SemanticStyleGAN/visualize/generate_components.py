@@ -46,7 +46,8 @@ def visualize_alpha(output_name, tensor):
     plt.savefig(output_name, bbox_inches='tight', pad_inches=0)
 
 if __name__ == '__main__':
-
+    device0 = 'cuda:0'
+    device1 = 'cuda:1'
     parser = argparse.ArgumentParser()
 
     parser.add_argument('ckpt', type=str, help="path to the model checkpoint")
@@ -72,11 +73,10 @@ if __name__ == '__main__':
 
     print("Loading model ...")
     ckpt = torch.load(args.ckpt)
-    model = make_model(ckpt['args'])
-    model.to(args.device)
+    model = make_model(ckpt['args'], device0=device0, device1=device1)
     model.eval()
     model.load_state_dict(ckpt['g_ema'])
-    mean_latent = model.style(torch.randn(args.truncation_mean, model.style_dim, device=args.device)).mean(0)
+    mean_latent = model.style(torch.randn(args.truncation_mean, model.style_dim, device=device0)).mean(0)
 
     print("Generating images...")
     if args.dataset_name == "celeba":
@@ -86,14 +86,14 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         if args.latent is None:
-            styles = model.style(torch.randn(args.sample, model.style_dim, device=args.device))
+            styles = model.style(torch.randn(args.sample, model.style_dim, device=device0))
             styles = args.truncation * styles + (1-args.truncation) * mean_latent.unsqueeze(0)
         else:
-            styles = torch.tensor(np.load(args.latent), device=args.device)
+            styles = torch.tensor(np.load(args.latent), device=device0)
 
         for sample_index in range(styles.size(0)):
             style_inputs = styles[sample_index:sample_index+1]
-            composition_mask = torch.zeros(1, model.n_local, device=args.device)
+            composition_mask = torch.zeros(1, model.n_local, device=device0)
             composition_mask[:,0] = 1
             sample_outdir = args.outdir if args.latent is not None else f'{args.outdir}/{sample_index}'
             if not os.path.exists(sample_outdir):

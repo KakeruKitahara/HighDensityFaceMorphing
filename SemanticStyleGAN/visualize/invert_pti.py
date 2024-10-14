@@ -220,7 +220,7 @@ if __name__ == '__main__':
     parser.add_argument('--step', type=int, default=400, help='latent optimization steps')
     parser.add_argument('--finetune_step', type=int, default=0, help='pivotal tuning inversion (PTI) steps (200-400 should give good result)')
     parser.add_argument('--noise_regularize', type=float, default=10)
-    parser.add_argument('--lambda_mse', type=float, default=0.1)
+    parser.add_argument('--lambda_mse', type=float, default=0.3)
     parser.add_argument('--lambda_lpips', type=float, default=1.0)
     parser.add_argument('--lambda_mean', type=float, default=1.0)
 
@@ -231,7 +231,6 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_alpha', type=float, default=30)
     parser.add_argument('--lambda_pt', type=float, default=1.0)
     parser.add_argument('--lambda_r', type=float, default=0.1)
-    # MEMO default mse=0.1, mean=1.0
 
     parser.add_argument('--pt_size', type=int, default=20)
     parser.add_argument('--r_size', type=int, default=10)
