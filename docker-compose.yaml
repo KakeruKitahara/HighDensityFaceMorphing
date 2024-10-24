@@ -16,10 +16,5 @@ services:
       - "8080:8888"
     command:
       jupyter-lab --ip 0.0.0.0 --allow-root --NotebookApp.token=''
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            capabilities: [gpu]
+    runtime: nvidia
 
