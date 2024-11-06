@@ -23,6 +23,7 @@ import torch
 from tqdm import tqdm
 from models import make_model
 from visualize.utils import mask_generate
+imageio.plugins.ffmpeg.download()
 
 latent_dict_celeba = {
     2:  "bcg_1",
@@ -68,10 +69,10 @@ if __name__ == '__main__':
                         help="path to the output directory")
     parser.add_argument('--batch', type=int, default=8,
                         help="batch size for inference")
-    parser.add_argument("--step", type=int, default=60,
+    parser.add_argument("--step", type=int, default=100,
                         help="number of latent steps for interpolation")
     parser.add_argument("--fps", type=int, default=30,
-                        help="number of fps of morphing")
+                        help="number of fps for morphing")
     parser.add_argument("--dataset_name", type=str, default="celeba",
                         help="used for finding mapping between latent indices and names")
 
@@ -134,8 +135,8 @@ if __name__ == '__main__':
 
         fps = args.fps
         imageio.mimwrite(
-            f'{movie_path}/{filename_start}-{filename_end}.mp4', images, fps=fps)
+            f'{movie_path}/{filename_start}_{filename_end}.mp4', images, fps=fps)
         imageio.mimwrite(
-            f'{movie_path}/{filename_start}-{filename_end}.gif', images, fps=fps)
+            f'{movie_path}/{filename_start}_{filename_end}.gif', images, fps=fps)
         imageio.mimwrite(
-            f'{movie_path}/{filename_start}-{filename_end}_mask.mp4', frames, fps=fps)
+            f'{movie_path}/{filename_start}_{filename_end}_mask.mp4', frames, fps=fps)

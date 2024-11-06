@@ -11,3 +11,4 @@ imageio-ffmpeg
 albumentations
 imgaug
 ninja
+plotly

@@ -134,10 +134,8 @@ data/
 # SemanticStyleGAN
 
 /pretrained/*
-!/pretrained/.gitkeep
 
 /images/*
-!/images/.gitkeep
 
 /memo.md
 /log*
@@ -145,3 +143,5 @@ data/
 /results/*
 
 /movemp4.py
+
+/mat/*

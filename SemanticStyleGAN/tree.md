@@ -17,7 +17,7 @@
 |   `-- invert_pti.py : 画像から潜在変数へ変換する
 |-- components_display.py* : -> generate_components.py
 |-- main.ipynb* : 本研究のnote
-|-- morphing.py* : -> generate_morph.py
+|-- morphing_line.py* : -> generate_morph.py
 |-- prepare_image_data.py*
 |-- prepare_inception.py*
 |-- prepare_mask_data.py* 
