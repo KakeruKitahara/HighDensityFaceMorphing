@@ -179,8 +179,7 @@ def optimize_pti(args, g_ema, target_img_tensor_array, latent_in_array, noises_a
                 loss_r * args.lambda_r
                 )
                 
-        print(f'loss: {loss.item():.6f} loss_pt: {loss_pt.item():.6f} loss_r: {loss_r.item():.6f}')
-        # TODO pbar.set_description()
+        pbar.set_description(f'loss: {loss.item():.6f} loss_pt: {loss_pt.item():.6f} loss_r: {loss_r.item():.6f}')
 
         g_ema_old = copy.deepcopy(g_ema)
         optimizer.zero_grad()
@@ -222,7 +221,7 @@ if __name__ == '__main__':
     parser.add_argument('--noise_regularize', type=float, default=10)
     parser.add_argument('--lambda_mse', type=float, default=0.3)
     parser.add_argument('--lambda_lpips', type=float, default=1.0)
-    parser.add_argument('--lambda_mean', type=float, default=1.0)
+    parser.add_argument('--lambda_mean', type=float, default=0.8)
 
     parser.add_argument('--lambda_mse_pti', type=float, default=0.3)
     parser.add_argument('--lambda_lpips_pti', type=float, default=1.0)
@@ -232,8 +231,8 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_pt', type=float, default=1.0)
     parser.add_argument('--lambda_r', type=float, default=0.1)
 
-    parser.add_argument('--pt_size', type=int, default=20)
-    parser.add_argument('--r_size', type=int, default=10)
+    parser.add_argument('--pt_size', type=int, default=999)
+    parser.add_argument('--r_size', type=int, default=3)
 
     parser.add_argument('--exist_latent', type=parse_boolean, default=False)
     parser.add_argument('--save_pt_step', type=parse_boolean, default=False)

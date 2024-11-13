@@ -54,16 +54,21 @@ def search_nearpnts(points, e_ed) :
 
     return x, x_indices
 
-def is_simplex(x, e_st) : 
+def is_simplex(x, e_st, dim) : 
     x_from_st = np.array([p - e_st for p in x])
     eps = 10e-15
-    det = np.linalg.det(x_from_st)
-    if abs(det) < eps :
-        raise Exception(f"""Det is {det}.
+    
+    rank = np.linalg.matrix_rank(x_from_st)
+    if rank != dim :
+        raise Exception(f"""Rank is {rank}.
                         {x}""")
-    else :
-        print(f'det : {det}')
-        return x_from_st
+    
+    x_from_st_normal = np.array([p / np.linalg.norm(p, ord=2)  for p in x_from_st])
+    det = np.linalg.det(x_from_st_normal)
+
+        
+    print(f'det : {det}')
+    return x_from_st
 
 def plot3d(points, x, x_indices, p_st, p_ed, dim) :
     plotp = np.concatenate([points, p_st.reshape(1, dim), p_ed.reshape(1,dim)])
@@ -73,6 +78,8 @@ def plot3d(points, x, x_indices, p_st, p_ed, dim) :
         colors[idx] = 'green' 
     colors[-2] = 'red'
     colors[-1] = 'orange'
+    label = list(range(pca_pnts.shape[0] + 2))
+    
 
     fig = go.Figure(data=[go.Scatter3d(
         x=plotp[:, 0],
@@ -80,18 +87,28 @@ def plot3d(points, x, x_indices, p_st, p_ed, dim) :
         z=plotp[:, 2],
         mode='markers',
         marker=dict(
-            size=5,
+            size=4,
             color=colors,
-        )
+        ), 
+        hovertext=label,
+        hoverinfo='text+x+y+z'
     )])
-
     fig.show()
-    input("Please key...")
+    
+    resel_idx_str = input("Select index...").split()
+    
+    if len(resel_idx_str) == dim and all(s.isnumeric() for s in resel_idx_str) :
+        x_indices = [int(s) for s in resel_idx_str]
+        x  = points[x_indices]
+    
+    return x, x_indices
+
 
 
 def clac_simplex(e, x, dim) :
     gamma = np.dot(e, np.linalg.inv(x))
     print(f'gamma : {gamma}')
+    print(f'sum : {sum(gamma)}')
 
     return gamma
 
@@ -167,31 +184,35 @@ if __name__ == '__main__':
         v = np.array(v)
         d = np.array(d)
         
-        d = d[5, 5] # TODO
-        v = v[5] #sample matlabでは列ベクトル TODO
+        d = d[1, 1] # TODO
+        v = -v[1] #sample matlabでは列ベクトル TODO
     
     pca_pnts = pca(pnts, fit_pnts, dim)
     partition = args.partition
     step = args.step
     
-    e = v * (np.sqrt(1 / d) / np.linalg.norm(v)) * 1 / partition
+
+    ax_len = np.sqrt(1 / d)
+    e = v  * ax_len / partition * 2
     st = pca_pnts[face2idx_tr[name]]
     styles_st = torch.tensor(np.load(os.path.join(args.latent_indir, f'{name}.npy')), device=device0)
     
     b = 0
     c = 0
-    styles_simplex_list=[]
+    styles_simplex_list=[styles_st]
+    print(d, v)
     
     print(f'Serching for {dim}-simplex')
     for p in range(partition) :
+        print(f'length : {np.linalg.norm(e, ord=2)}')
         e_st = st + e * p
         e_ed = st + e * (p + 1)
         
         x, x_inds = search_nearpnts(pca_pnts, e_ed)
-        x_from_st = is_simplex(x, e_st)
+        x_from_st = is_simplex(x, e_st, dim)
         gamma = clac_simplex(e, x_from_st, dim)
         
-        plot3d(pca_pnts, x, x_inds, e_st, e_ed, dim)
+        # x, x_inds = plot3d(pca_pnts, x, x_inds, e_st, e_ed, dim)
         
         styles_x_list=[]
         for x_idx in x_inds :
@@ -216,34 +237,38 @@ if __name__ == '__main__':
             
             stnum = styles_start.detach().cpu().numpy()
             _, b, c = stnum.shape
-            styles_x = torch.empty((b, c), device=device0)
+            styles_x = torch.empty((1, b, c), device=device0)
             
             composition_mask = torch.zeros(1, model.n_local, device=device0)
             composition_mask[:,0:6] = 1
             
-            beta = (1 / (step - 1)) * (int(os.path.splitext(x_path_list[-1])[0]) - 1)
+            beta = (1 / (step - 1)) * (int(os.path.splitext(x_path_list[-1])[0]) - 1) #XXX sum = 1にしないといけない．
             
             for latent_index, _ in latent_dict.items():
-                styles_x = (1-beta) * styles_start[:, latent_index] + beta * styles_end[:, latent_index]
+                tmp = (1-beta) * styles_start[:, latent_index] + beta * styles_end[:, latent_index]
+                styles_x[0, latent_index] = tmp
             
             styles_x_list.append(styles_x)
         
-        styles_simplex = torch.empty((b, c), device=device0)
+        styles_simplex = torch.empty((1, b, c), device=device0)
         
         for latent_index, _ in latent_dict.items():
             tmp = 0
             for g, styles_x in zip(gamma, styles_x_list) :
-                styles_simplex += g * styles_x[:, latent_index]
+                tmp += g * styles_x[:, latent_index]
+            tmp += (1 - sum(gamma)) * styles_st[:, latent_index]
+            styles_simplex[0, latent_index] = tmp
         
         styles_st = styles_simplex
         styles_simplex_list.append(styles_simplex)
         
-    
     print(f'Create Morphing {name}')
     itr = int(step / partition)
-    styles_new = torch.empty((step, b, c), device=device0)
     with tqdm(total=itr * partition) as pbar: 
+        styles_new = torch.empty((step, b, c), device=device0)
         for p in range(partition) :
+            styles_start = styles_simplex_list[p]
+            styles_end = styles_simplex_list[p + 1]
             for i in range(itr):
                 alpha = (1/(itr-1))*i
                 for latent_index, _ in latent_dict.items():
@@ -253,7 +278,7 @@ if __name__ == '__main__':
                 image, _ = mask_generate(model, style_image, randomize_noise=False, composition_mask=composition_mask)
                 pbar.update()
 
-                imageio.imwrite(f'{flip_path}/{(i + 1) + p * itr}.png', image[0])
+                imageio.imwrite(f'{flip_path}/{(i + 1) + p * itr:03}.png', image[0])
 
     images, segs = mask_generate(model, styles_new, randomize_noise=False, batch_size=args.batch, composition_mask=composition_mask)
     frames = [np.concatenate((img, seg), 1)

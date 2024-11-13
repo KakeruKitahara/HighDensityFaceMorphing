@@ -123,12 +123,13 @@ if __name__ == '__main__':
         for i in tqdm(range(itr)):
             alpha = (1/(itr-1))*i
             for latent_index, _ in latent_dict.items():
+                print(styles_start.shape)
                 tmp = (1-alpha) * styles_start[:, latent_index] + alpha * styles_end[:, latent_index]
                 styles_new[i, latent_index] = tmp
             style_image = torch.unsqueeze(styles_new[i], dim=0)
             image, _ = mask_generate(model, style_image, randomize_noise=False, composition_mask=composition_mask)
 
-            imageio.imwrite(f'{flip_path}/{i + 1}.png', image[0])
+            imageio.imwrite(f'{flip_path}/{i + 1:03}.png', image[0])
         images, segs = mask_generate(model, styles_new, randomize_noise=False, batch_size=args.batch, composition_mask=composition_mask)
         frames = [np.concatenate((img, seg), 1)
                   for (img, seg) in zip(images, segs)]
