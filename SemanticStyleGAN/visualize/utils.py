@@ -16,8 +16,12 @@
 # OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import numpy as np
+import os
 import torch
 from scipy.interpolate import CubicSpline
+import itertools
+import plotly.graph_objects as go
+
 
 color_map = {
     0: [0, 0, 0],
@@ -94,3 +98,101 @@ def cubic_spline_interpolate(styles, step):
     results = spl(x_out) # Step x KD
     results = results.reshape(step,K,D)
     return torch.tensor(results, device=device).float()
+
+
+def arrowhead(start, end) :
+    arrow_vec = np.array(end - start)
+    arrow_length = np.linalg.norm(arrow_vec)
+    arrow_unit = arrow_vec /arrow_length
+    cone_height = 0.5 * arrow_length
+
+    cone_base = end - arrow_unit * cone_height
+    cone_x = cone_base[0]
+    cone_y = cone_base[1] 
+    cone_z = cone_base[2]
+    
+    return arrow_unit, (cone_x, cone_y, cone_z)
+
+
+
+def plot3d(points, x, x_indices, start, end, dim, mode, step, args) :
+    plotp = np.concatenate([points, start.reshape(1, dim), end.reshape(1,dim)])
+    colors = ['blue'] * (points.shape[0] + 2)
+    for idx in x_indices :
+        colors[idx] = 'green' 
+    colors[-2] = 'red'
+    colors[-1] = 'orange'
+    label = list(range(points.shape[0] + 2))
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter3d(
+        x=plotp[:, 0],
+        y=plotp[:, 1],
+        z=plotp[:, 2],
+        mode='markers',
+        marker=dict(
+            size=4,
+            color=colors,
+        ), 
+        hovertext=label,
+        hoverinfo='text+x+y+z'
+    ))
+    
+    unit, cone = arrowhead(start[:3], end[:3])
+    fig.add_trace(go.Scatter3d(
+        x=[start[0], end[0]],
+        y=[start[1], end[1]],
+        z=[start[2], end[2]],
+        mode='lines',
+        line=dict(color='red', width=7),
+    ))
+    fig.add_trace(go.Cone(
+        x=[cone[0]],
+        y=[cone[1]],
+        z=[cone[2]],
+        u=[unit[0]],
+        v=[unit[1]],
+        w=[unit[2]],
+        sizemode="absolute",
+        colorscale=[[0, 'red'], [1, 'red']], 
+        sizeref=0.1,
+        showscale=False
+    ))
+    
+    plotm=np.concatenate([x, start.reshape(1, dim)])
+    combinations = list(itertools.combinations(range(7), 3))
+    i, j, k = zip(*combinations)
+    
+    fig.add_trace(go.Mesh3d(
+        x=plotm[:, 0],
+        y=plotm[:, 1],
+        z=plotm[:, 2],
+        i =i, 
+        j =j, 
+        k = k, 
+        opacity=0.1,
+        color='cyan'
+    ))
+    
+    
+    if mode == 1:
+        name = args.axis_name
+        graph_path = f'{args.outdir}/graph/{name}'
+        os.makedirs(graph_path, exist_ok=True)
+        fig.write_html(f'{graph_path}/{step}.html')
+        
+        return 
+    elif mode == 2:
+        resel_idx_str = input("Select index...").split()
+
+        if len(resel_idx_str) == dim and all(s.isnumeric() for s in resel_idx_str) :
+            x_indices = [int(s) for s in resel_idx_str]
+            x  = points[x_indices]
+
+        return x, x_indices
+    else :
+        fig.show()
+        input("Key input...")
+        return 
+

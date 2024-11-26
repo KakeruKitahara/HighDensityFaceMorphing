@@ -5,11 +5,14 @@ import numpy as np
 import imageio
 import torch
 from models import make_model
-from visualize.utils import mask_generate
+from visualize.utils import mask_generate, plot3d
 import h5py
 import json
 from sklearn.decomposition import PCA
 import plotly.graph_objects as go
+import itertools
+import random
+import sys
 imageio.plugins.ffmpeg.download()
 
 latent_dict_celeba = {
@@ -47,70 +50,66 @@ def pca(points, fit_points, dim):
     
     return pca_points
 
-def search_nearpnts(points, e_ed) :
-    dis = np.linalg.norm(points - e_ed, axis=1)
-    x_indices = np.argsort(dis)[1:dim + 1]
-    x = points[x_indices]
 
-    return x, x_indices
+def is_simplex(x, start, dim, args) : 
+    eps = args.eps
+    V = np.array([p - start for p in x]).T
 
-def is_simplex(x, e_st, dim) : 
-    x_from_st = np.array([p - e_st for p in x])
-    eps = 10e-15
-    
-    rank = np.linalg.matrix_rank(x_from_st)
+    rank = np.linalg.matrix_rank(V)
     if rank != dim :
-        raise Exception(f"""Rank is {rank}.
-                        {x}""")
-    
-    x_from_st_normal = np.array([p / np.linalg.norm(p, ord=2)  for p in x_from_st])
-    det = np.linalg.det(x_from_st_normal)
+        return False, V, 0
 
-        
-    print(f'det : {det}')
-    return x_from_st
+    V_normal = V / np.linalg.norm(V, axis=0, ord=2)
+    det = np.linalg.det(V_normal)
+    if abs(det) < eps :
+        return False, V, det
 
-def plot3d(points, x, x_indices, p_st, p_ed, dim) :
-    plotp = np.concatenate([points, p_st.reshape(1, dim), p_ed.reshape(1,dim)])
-    
-    colors = ['blue'] * (pca_pnts.shape[0] + 2)
-    for idx in x_indices :
-        colors[idx] = 'green' 
-    colors[-2] = 'red'
-    colors[-1] = 'orange'
-    label = list(range(pca_pnts.shape[0] + 2))
-    
+    return True, V, det
 
-    fig = go.Figure(data=[go.Scatter3d(
-        x=plotp[:, 0],
-        y=plotp[:, 1],
-        z=plotp[:, 2],
-        mode='markers',
-        marker=dict(
-            size=4,
-            color=colors,
-        ), 
-        hovertext=label,
-        hoverinfo='text+x+y+z'
-    )])
-    fig.show()
-    
-    resel_idx_str = input("Select index...").split()
-    
-    if len(resel_idx_str) == dim and all(s.isnumeric() for s in resel_idx_str) :
-        x_indices = [int(s) for s in resel_idx_str]
-        x  = points[x_indices]
-    
-    return x, x_indices
+def clac_simplex(e, V, dim, args) :
+    sup = args.sup
+    inf = args.inf
+    gamma = np.dot(np.linalg.inv(V), e)
+
+    if not all(inf < g < sup for g in gamma) or not inf < 1 - sum(gamma) < sup:
+        return False, gamma
+
+    return True, gamma
 
 
+def search_nearpnts(points, start, end, e, dim, args) :
+    cand_num = args.candidate_number
+    dis = np.linalg.norm(points - end, axis=1)
+    x_inds_cand = list(np.argsort(dis)[1:cand_num + 1])
 
-def clac_simplex(e, x, dim) :
-    gamma = np.dot(e, np.linalg.inv(x))
-    print(f'gamma : {gamma}')
-    print(f'sum : {sum(gamma)}')
+    att = 0
 
-    return gamma
+    lim = int(1e6)
+    while att < lim :
+        att += 1
+        x_inds = random.sample(x_inds_cand, dim)
+        x  = points[x_inds]
+
+        bool_is, V , det = is_simplex(x, start, dim, args)
+        if not bool_is :
+            continue
+
+        bool_clac, gamma = clac_simplex(e, V, dim, args)
+        if not bool_clac :
+            continue
+
+        d = [dis[i] for i in x_inds]
+        print(f'det : {det}')
+        print(f'gamma : {gamma}, {1 - sum(gamma)}')
+        print(f"dis : {d}")
+        print(f'att : {att}')
+
+        break
+    else:
+        raise Exception("Timeout serching near points.")
+
+    return x, x_inds, gamma
+
 
 
 if __name__ == '__main__':
@@ -118,12 +117,18 @@ if __name__ == '__main__':
     device1 = 'cuda:1'
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ckpt', type=str, help="path to the model checkpoint")
-    parser.add_argument('--axis', type=str, default=None, help="direction vector in a low level space") # 研究の都合上matファイルで読み込む． ./mat/axis.mat
-    parser.add_argument('--axis_name', type=str, default=None, help="name of direction vector")
-    parser.add_argument('--points', type=str, default=None, help="points of a low level space") # 研究の都合上matファイルで読み込む．./mat/points.mat
-    parser.add_argument('--points_info', type=str, default=None, help="points of a low level space")
-    parser.add_argument('--fit_points', type=str, default=None, help="points of a low level space") # pcaの基準，研究の都合上matファイルで読み込む．./mat/thresholds_all.mat
+    parser.add_argument('--ckpt', type=str,
+                        help="path to the model checkpoint")
+    parser.add_argument('--axis', type=str, default=None,
+                        help="direction vector in a low level space")
+    parser.add_argument('--axis_name', type=str, default=None,
+                        help="facial name of direction vector")
+    parser.add_argument('--points', type=str, default=None,
+                        help="matrix of facial images")
+    parser.add_argument('--points_info', type=str, default=None,
+                        help="json to connect facial matrix and id")
+    parser.add_argument('--fit_points', type=str, default=None,
+                        help="matrix of dimension-reduced facial images")
     parser.add_argument('--latent_indir', type=str, default='./results/inversion/latent/',
                         help="path to the latent numpy directory")
     parser.add_argument('--morph_indir', type=str, default='./results/interpolation/flip/',
@@ -134,18 +139,28 @@ if __name__ == '__main__':
                         help="batch size for inference")
     parser.add_argument("--dim", type=int, default=10,
                         help="number of dimention for pca")
+    parser.add_argument('--axis_number', type=int, default=1,
+                        help="axis number to make the expression follow")
     parser.add_argument("--step", type=int, default=100,
-                        help="number of latent steps for interpolation") # equal input morph step
+                        help="number of latent steps for interpolation") #Equal input morph step
     parser.add_argument("--partition", type=int, default=10,
-                        help="number of division for simplex method") # step % partition == 0
+                        help="number of division for simplex method") #Dividing step by partition, the remainder should be zero.
     parser.add_argument("--fps", type=int, default=30,
                         help="number of fps for morphing")
     parser.add_argument("--dataset_name", type=str, default="celeba",
                         help="used for finding mapping between latent indices and names")
+    parser.add_argument("--candidate_number", type=int, default=600,
+                        help="number of candidate point")
+    parser.add_argument("--eps", type=float, default=0.1,
+                        help="threshold for well or ill-conditioned")
+    parser.add_argument("--sup", type=float, default=1.2,
+                        help="upper limit of simplex")
+    parser.add_argument("--inf", type=float, default=-0.2,
+                        help="lower limit of simplex")
     args = parser.parse_args()
     
+    print(args)
     print("Loading model ...")
-    
     ckpt = torch.load(args.ckpt)
     model = make_model(ckpt['args'], device0=device0, device1=device1)
     model.eval()
@@ -161,7 +176,6 @@ if __name__ == '__main__':
         latent_dict = latent_dict_celeba
     else:
         raise ValueError("Unknown dataset name: f{args.dataset_name}")
-    
     
     dim = args.dim
     
@@ -179,13 +193,15 @@ if __name__ == '__main__':
         fit_pnts  = f['thresholds_all'][:] 
         fit_pnts = np.transpose(np.array(fit_pnts))
     
+    ax_num = args.axis_number
     with h5py.File(args.axis, 'r') as f:
         v, d = f['v'][:], f['d'][:]
         v = np.array(v)
         d = np.array(d)
-        
-        d = d[1, 1] # TODO
-        v = -v[1] #sample matlabでは列ベクトル TODO
+
+        d = d[ax_num, ax_num]
+        v = -v[ax_num] # Consider also the reverse direction.
+        print()
     
     pca_pnts = pca(pnts, fit_pnts, dim)
     partition = args.partition
@@ -193,27 +209,24 @@ if __name__ == '__main__':
     
 
     ax_len = np.sqrt(1 / d)
-    e = v  * ax_len / partition * 2
-    st = pca_pnts[face2idx_tr[name]]
+    ax_step = v * ax_len / partition  #TODO 計測するときはサイズを固定する（枚数が変化する，枚数を下限に合わせる）
+    base_point = pca_pnts[face2idx_tr[name]]
     styles_st = torch.tensor(np.load(os.path.join(args.latent_indir, f'{name}.npy')), device=device0)
-    
+
     b = 0
     c = 0
-    styles_simplex_list=[styles_st]
+    styles_simplex_list = [styles_st]
     print(d, v)
-    
+
     print(f'Serching for {dim}-simplex')
     for p in range(partition) :
-        print(f'length : {np.linalg.norm(e, ord=2)}')
-        e_st = st + e * p
-        e_ed = st + e * (p + 1)
-        
-        x, x_inds = search_nearpnts(pca_pnts, e_ed)
-        x_from_st = is_simplex(x, e_st, dim)
-        gamma = clac_simplex(e, x_from_st, dim)
-        
-        # x, x_inds = plot3d(pca_pnts, x, x_inds, e_st, e_ed, dim)
-        
+        st = base_point + ax_step * p
+        ed = base_point + ax_step * (p + 1)
+
+        print(p + 1)
+        x, x_inds, gamma = search_nearpnts(pca_pnts, st, ed, ax_step, dim, args)
+        plot3d(pca_pnts, x, x_inds, st, ed, dim, 1, p, args)
+
         styles_x_list=[]
         for x_idx in x_inds :
             x_path = idx2path_tr[x_idx]
@@ -242,10 +255,10 @@ if __name__ == '__main__':
             composition_mask = torch.zeros(1, model.n_local, device=device0)
             composition_mask[:,0:6] = 1
             
-            beta = (1 / (step - 1)) * (int(os.path.splitext(x_path_list[-1])[0]) - 1) #XXX sum = 1にしないといけない．
+            beta = (1 / (step - 1)) * (int(os.path.splitext(x_path_list[-1])[0]) - 1)
             
             for latent_index, _ in latent_dict.items():
-                tmp = (1-beta) * styles_start[:, latent_index] + beta * styles_end[:, latent_index]
+                tmp = (1 - beta) * styles_start[:, latent_index] + beta * styles_end[:, latent_index]
                 styles_x[0, latent_index] = tmp
             
             styles_x_list.append(styles_x)
