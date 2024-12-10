@@ -23,7 +23,6 @@ import torch
 from tqdm import tqdm
 from models import make_model
 from visualize.utils import mask_generate
-imageio.plugins.ffmpeg.download()
 
 latent_dict_celeba = {
     2:  "bcg_1",

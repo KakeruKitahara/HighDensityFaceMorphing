@@ -113,23 +113,11 @@ def arrowhead(start, end) :
     
     return arrow_unit, (cone_x, cone_y, cone_z)
 
-
-
-def plot3d(points, x, x_indices, start, end, dim, mode, step, args) :
-    plotp = np.concatenate([points, start.reshape(1, dim), end.reshape(1,dim)])
-    colors = ['blue'] * (points.shape[0] + 2)
-    for idx in x_indices :
-        colors[idx] = 'green' 
-    colors[-2] = 'red'
-    colors[-1] = 'orange'
-    label = list(range(points.shape[0] + 2))
-    
-    fig = go.Figure()
-    
-    fig.add_trace(go.Scatter3d(
-        x=plotp[:, 0],
-        y=plotp[:, 1],
-        z=plotp[:, 2],
+def Scatter3d(fig, point, d1, d2, d3, colors, label) :
+        fig.add_trace(go.Scatter3d(
+        x=point[:, d1],
+        y=point[:, d2],
+        z=point[:, d3],
         mode='markers',
         marker=dict(
             size=4,
@@ -138,36 +126,52 @@ def plot3d(points, x, x_indices, start, end, dim, mode, step, args) :
         hovertext=label,
         hoverinfo='text+x+y+z'
     ))
+
+
+
+def plot3d(points, x, x_indices, start, end, dim, mode, step, args) :
+    d1, d2, d3 = 0,1,2
+    st_ed = np.concatenate([start.reshape(1, dim), end.reshape(1,dim)])
+    label_p = list(range(points.shape[0]))
+    label_se = list(range(points.shape[0], points.shape[0] + 2))
+    
+    fig = go.Figure()
+    
+    Scatter3d(fig, points, d1, d2, d3, 'blue', label_p)
     
     unit, cone = arrowhead(start[:3], end[:3])
     fig.add_trace(go.Scatter3d(
-        x=[start[0], end[0]],
-        y=[start[1], end[1]],
-        z=[start[2], end[2]],
+        x=[start[d1], end[d1]],
+        y=[start[d2], end[d2]],
+        z=[start[d3], end[d3]],
         mode='lines',
         line=dict(color='red', width=7),
     ))
+    
     fig.add_trace(go.Cone(
-        x=[cone[0]],
-        y=[cone[1]],
-        z=[cone[2]],
-        u=[unit[0]],
-        v=[unit[1]],
-        w=[unit[2]],
+        x=[cone[d1]],
+        y=[cone[d2]],
+        z=[cone[d3]],
+        u=[unit[d1]],
+        v=[unit[d2]],
+        w=[unit[d3]],
         sizemode="absolute",
         colorscale=[[0, 'red'], [1, 'red']], 
         sizeref=0.1,
         showscale=False
     ))
     
+    Scatter3d(fig, x,  d1, d2, d3, 'green', x_indices)
+    Scatter3d(fig, st_ed,  d1, d2, d3, 'red', label_se)
+    
     plotm=np.concatenate([x, start.reshape(1, dim)])
     combinations = list(itertools.combinations(range(7), 3))
     i, j, k = zip(*combinations)
     
     fig.add_trace(go.Mesh3d(
-        x=plotm[:, 0],
-        y=plotm[:, 1],
-        z=plotm[:, 2],
+        x=plotm[:, d1],
+        y=plotm[:, d2],
+        z=plotm[:, d3],
         i =i, 
         j =j, 
         k = k, 
@@ -175,10 +179,11 @@ def plot3d(points, x, x_indices, start, end, dim, mode, step, args) :
         color='cyan'
     ))
     
-    
     if mode == 1:
         name = args.axis_name
-        graph_path = f'{args.outdir}/graph/{name}'
+        ax_num = args.axis_number
+        fname = f'{name}_{ax_num}'
+        graph_path = f'{args.outdir}/graph/{fname}'
         os.makedirs(graph_path, exist_ok=True)
         fig.write_html(f'{graph_path}/{step}.html')
         

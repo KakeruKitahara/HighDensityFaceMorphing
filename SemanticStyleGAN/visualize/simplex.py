@@ -9,11 +9,7 @@ from visualize.utils import mask_generate, plot3d
 import h5py
 import json
 from sklearn.decomposition import PCA
-import plotly.graph_objects as go
-import itertools
 import random
-import sys
-imageio.plugins.ffmpeg.download()
 
 latent_dict_celeba = {
     2:  "bcg_1",
@@ -76,15 +72,12 @@ def clac_simplex(e, V, dim, args) :
 
     return True, gamma
 
-
-def search_nearpnts(points, start, end, e, dim, args) :
+def search_nearpnts(points, start, end, e, dim, args, G) :
     cand_num = args.candidate_number
     dis = np.linalg.norm(points - end, axis=1)
     x_inds_cand = list(np.argsort(dis)[1:cand_num + 1])
-
     att = 0
-
-    lim = int(1e6)
+    lim = int(1e7)
     while att < lim :
         att += 1
         x_inds = random.sample(x_inds_cand, dim)
@@ -97,13 +90,10 @@ def search_nearpnts(points, start, end, e, dim, args) :
         bool_clac, gamma = clac_simplex(e, V, dim, args)
         if not bool_clac :
             continue
-
-        d = [dis[i] for i in x_inds]
         print(f'det : {det}')
         print(f'gamma : {gamma}, {1 - sum(gamma)}')
         print(f"dis : {d}")
         print(f'att : {att}')
-
         break
     else:
         raise Exception("Timeout serching near points.")
@@ -165,10 +155,14 @@ if __name__ == '__main__':
     model = make_model(ckpt['args'], device0=device0, device1=device1)
     model.eval()
     model.load_state_dict(ckpt['g_ema'])
-
+    
+    dim = args.dim
     name = args.axis_name
-    movie_path = f'{args.outdir}/movie_simplex/{name}'
-    flip_path = f'{args.outdir}/flip_simplex/{name}'
+    ax_num = args.axis_number
+    
+    fname = f'{name}_{ax_num}'
+    movie_path = f'{args.outdir}/movie_simplex/{fname}'
+    flip_path = f'{args.outdir}/flip_simplex/{fname}'
     os.makedirs(movie_path, exist_ok=True)
     os.makedirs(flip_path, exist_ok=True)
     
@@ -176,8 +170,6 @@ if __name__ == '__main__':
         latent_dict = latent_dict_celeba
     else:
         raise ValueError("Unknown dataset name: f{args.dataset_name}")
-    
-    dim = args.dim
     
     with h5py.File(args.points, 'r') as f:
         pnts = f['thresholds_all'][:]
@@ -188,20 +180,16 @@ if __name__ == '__main__':
         idx2path_tr = [s.replace('\\', '/') for s in json_data['fullPathsUnique']]
         face2idx_tr = {k : v for k, v in zip(json_data['facialMapKeys'], json_data['facialMapValues'])}
     
-    
     with h5py.File(args.fit_points, 'r') as f:
         fit_pnts  = f['thresholds_all'][:] 
         fit_pnts = np.transpose(np.array(fit_pnts))
     
-    ax_num = args.axis_number
     with h5py.File(args.axis, 'r') as f:
-        v, d = f['v'][:], f['d'][:]
-        v = np.array(v)
-        d = np.array(d)
-
-        d = d[ax_num, ax_num]
-        v = -v[ax_num] # Consider also the reverse direction.
-        print()
+        G = f['G_tmp'][:]
+        
+    d, v = np.linalg.eig(G)
+    d = d[ax_num]
+    v = v[ax_num]
     
     pca_pnts = pca(pnts, fit_pnts, dim)
     partition = args.partition
@@ -209,7 +197,7 @@ if __name__ == '__main__':
     
 
     ax_len = np.sqrt(1 / d)
-    ax_step = v * ax_len / partition  #TODO 計測するときはサイズを固定する（枚数が変化する，枚数を下限に合わせる）
+    ax_step = v * ax_len / partition # 1step : 1/100*ax_len
     base_point = pca_pnts[face2idx_tr[name]]
     styles_st = torch.tensor(np.load(os.path.join(args.latent_indir, f'{name}.npy')), device=device0)
 
@@ -224,7 +212,7 @@ if __name__ == '__main__':
         ed = base_point + ax_step * (p + 1)
 
         print(p + 1)
-        x, x_inds, gamma = search_nearpnts(pca_pnts, st, ed, ax_step, dim, args)
+        x, x_inds, gamma = search_nearpnts(pca_pnts, st, ed, ax_step, dim, args, G)
         plot3d(pca_pnts, x, x_inds, st, ed, dim, 1, p, args)
 
         styles_x_list=[]
@@ -299,8 +287,8 @@ if __name__ == '__main__':
     
     fps = args.fps
     imageio.mimwrite(
-        f'{movie_path}/{name}.mp4', images, fps=fps)
+        f'{movie_path}/{fname}.mp4', images, fps=fps)
     imageio.mimwrite(
-        f'{movie_path}/{name}.gif', images, fps=fps)
+        f'{movie_path}/{fname}.gif', images, fps=fps)
     imageio.mimwrite(
-        f'{movie_path}/{name}_mask.mp4', frames, fps=fps)
+        f'{movie_path}/{fname}_mask.mp4', frames, fps=fps)

@@ -1,9 +1,9 @@
-FROM nvidia/cuda:12.2.2-devel-ubuntu20.04
+FROM nvidia/cuda:11.2.2-cudnn8-devel-ubuntu20.04
 
 WORKDIR /root/work
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Python3.6
+# Python3.8
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
   software-properties-common \
@@ -15,14 +15,9 @@ RUN apt-get update \
   rm -rf /usr/local/src/* && \
   add-apt-repository ppa:deadsnakes/ppa && \
   apt-get update && \
-  apt-get install -y python3.6 python3.6-distutils python3.6-dev && \
-  curl https://bootstrap.pypa.io/pip/3.6/get-pip.py -o get-pip.py && \
-  python3.6 get-pip.py && \
-  rm get-pip.py
+  apt-get install -y python3.8 python3.8-distutils python3.8-dev pip
 
-
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.6 30 && \
-  update-alternatives --install /usr/bin/pip pip /usr/local/bin/pip3 30
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 30
 
 # SemanticStyleGANはmaster ( https://github.com/seasonSH/SemanticStyleGAN#pretrained-models )
 COPY SemanticStyleGAN/requirements.txt .
