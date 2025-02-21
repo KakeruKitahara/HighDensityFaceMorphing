@@ -100,20 +100,7 @@ def cubic_spline_interpolate(styles, step):
     return torch.tensor(results, device=device).float()
 
 
-def arrowhead(start, end) :
-    arrow_vec = np.array(end - start)
-    arrow_length = np.linalg.norm(arrow_vec)
-    arrow_unit = arrow_vec /arrow_length
-    cone_height = 0.5 * arrow_length
-
-    cone_base = end - arrow_unit * cone_height
-    cone_x = cone_base[0]
-    cone_y = cone_base[1] 
-    cone_z = cone_base[2]
-    
-    return arrow_unit, (cone_x, cone_y, cone_z)
-
-def Scatter3d(fig, point, d1, d2, d3, colors, label) :
+def Scatter3d(fig, point, d1, d2, d3, colors, label, symbols) :
         fig.add_trace(go.Scatter3d(
         x=point[:, d1],
         y=point[:, d2],
@@ -122,6 +109,7 @@ def Scatter3d(fig, point, d1, d2, d3, colors, label) :
         marker=dict(
             size=4,
             color=colors,
+            symbol=symbols,
         ), 
         hovertext=label,
         hoverinfo='text+x+y+z'
@@ -129,17 +117,19 @@ def Scatter3d(fig, point, d1, d2, d3, colors, label) :
 
 
 
-def plot3d(points, x, x_indices, start, end, dim, mode, step, args) :
-    d1, d2, d3 = 0,1,2
+def plot3d(points, x, x_indices, start, end, dim, mode, step, args, f) :
+    if f == 0 :
+        d1, d2, d3 = 0,1,2
+    else :
+        d1, d2, d3 = 3,4,5
     st_ed = np.concatenate([start.reshape(1, dim), end.reshape(1,dim)])
     label_p = list(range(points.shape[0]))
     label_se = list(range(points.shape[0], points.shape[0] + 2))
     
     fig = go.Figure()
     
-    Scatter3d(fig, points, d1, d2, d3, 'blue', label_p)
+    Scatter3d(fig, points, d1, d2, d3, 'blue', label_p, 'circle')
     
-    unit, cone = arrowhead(start[:3], end[:3])
     fig.add_trace(go.Scatter3d(
         x=[start[d1], end[d1]],
         y=[start[d2], end[d2]],
@@ -148,21 +138,9 @@ def plot3d(points, x, x_indices, start, end, dim, mode, step, args) :
         line=dict(color='red', width=7),
     ))
     
-    fig.add_trace(go.Cone(
-        x=[cone[d1]],
-        y=[cone[d2]],
-        z=[cone[d3]],
-        u=[unit[d1]],
-        v=[unit[d2]],
-        w=[unit[d3]],
-        sizemode="absolute",
-        colorscale=[[0, 'red'], [1, 'red']], 
-        sizeref=0.1,
-        showscale=False
-    ))
-    
-    Scatter3d(fig, x,  d1, d2, d3, 'green', x_indices)
-    Scatter3d(fig, st_ed,  d1, d2, d3, 'red', label_se)
+
+    Scatter3d(fig, x,  d1, d2, d3, 'green', x_indices, 'circle')
+    Scatter3d(fig, st_ed,  d1, d2, d3, 'red', label_se, ['circle', 'diamond'])
     
     plotm=np.concatenate([x, start.reshape(1, dim)])
     combinations = list(itertools.combinations(range(7), 3))
@@ -182,8 +160,10 @@ def plot3d(points, x, x_indices, start, end, dim, mode, step, args) :
     if mode == 1:
         name = args.axis_name
         ax_num = args.axis_number
-        fname = f'{name}_{ax_num}'
+        str_plus = '+' if args.axis_plus else '-'
+        fname = f'{name}_{ax_num}_{str_plus}_{d1}{d2}{d3}'
         graph_path = f'{args.outdir}/graph/{fname}'
+        os.makedirs(graph_path, exist_ok=True)
         os.makedirs(graph_path, exist_ok=True)
         fig.write_html(f'{graph_path}/{step}.html')
         
@@ -200,4 +180,3 @@ def plot3d(points, x, x_indices, start, end, dim, mode, step, args) :
         fig.show()
         input("Key input...")
         return 
-

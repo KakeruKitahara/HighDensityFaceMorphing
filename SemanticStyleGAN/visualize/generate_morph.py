@@ -122,7 +122,6 @@ if __name__ == '__main__':
         for i in tqdm(range(itr)):
             alpha = (1/(itr-1))*i
             for latent_index, _ in latent_dict.items():
-                print(styles_start.shape)
                 tmp = (1-alpha) * styles_start[:, latent_index] + alpha * styles_end[:, latent_index]
                 styles_new[i, latent_index] = tmp
             style_image = torch.unsqueeze(styles_new[i], dim=0)

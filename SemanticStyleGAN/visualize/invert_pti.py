@@ -16,7 +16,6 @@
 # OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import os
-import shutil
 import math
 import argparse
 from tqdm import tqdm
@@ -55,8 +54,6 @@ def calc_lpips_loss(im1, im2):
     return p_loss
 
 def calc_mse_loss(im1, im2):
-    # im1 = F.adaptive_avg_pool2d(im1, (256,256))
-    # im2 = F.adaptive_avg_pool2d(im2, (256,256))
     mse_loss = F.mse_loss(im1.to(device0), im2.to(device0))
     return mse_loss
 
@@ -221,7 +218,7 @@ if __name__ == '__main__':
     parser.add_argument('--noise_regularize', type=float, default=10)
     parser.add_argument('--lambda_mse', type=float, default=0.3)
     parser.add_argument('--lambda_lpips', type=float, default=1.0)
-    parser.add_argument('--lambda_mean', type=float, default=0.8)
+    parser.add_argument('--lambda_mean', type=float, default=0.9)
 
     parser.add_argument('--lambda_mse_pti', type=float, default=0.3)
     parser.add_argument('--lambda_lpips_pti', type=float, default=1.0)

@@ -72,12 +72,12 @@ def clac_simplex(e, V, dim, args) :
 
     return True, gamma
 
-def search_nearpnts(points, start, end, e, dim, args, G) :
+def search_nearpnts(points, start, end, e, dim, args) :
     cand_num = args.candidate_number
     dis = np.linalg.norm(points - end, axis=1)
     x_inds_cand = list(np.argsort(dis)[1:cand_num + 1])
     att = 0
-    lim = int(1e7)
+    lim = int(1e6)
     while att < lim :
         att += 1
         x_inds = random.sample(x_inds_cand, dim)
@@ -90,9 +90,12 @@ def search_nearpnts(points, start, end, e, dim, args, G) :
         bool_clac, gamma = clac_simplex(e, V, dim, args)
         if not bool_clac :
             continue
+        
+        dis2 = np.linalg.norm(x - end, axis=1)
         print(f'det : {det}')
         print(f'gamma : {gamma}, {1 - sum(gamma)}')
-        print(f"dis : {d}")
+        print(f"dis : {dis2}")
+        print(f"sumdis : {sum(dis2)}")
         print(f'att : {att}')
         break
     else:
@@ -110,7 +113,11 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt', type=str,
                         help="path to the model checkpoint")
     parser.add_argument('--axis', type=str, default=None,
-                        help="direction vector in a low level space")
+                        help="direction vector(metric tensor) in a low level space")
+    parser.add_argument('--axis_number', type=int, default=0,
+                        help="axis number to make the expression follow")
+    parser.add_argument('--axis_plus', type=int, default=True,
+            help="direction of morphing (plus : True, minus : Flase)")
     parser.add_argument('--axis_name', type=str, default=None,
                         help="facial name of direction vector")
     parser.add_argument('--points', type=str, default=None,
@@ -129,8 +136,6 @@ if __name__ == '__main__':
                         help="batch size for inference")
     parser.add_argument("--dim", type=int, default=10,
                         help="number of dimention for pca")
-    parser.add_argument('--axis_number', type=int, default=1,
-                        help="axis number to make the expression follow")
     parser.add_argument("--step", type=int, default=100,
                         help="number of latent steps for interpolation") #Equal input morph step
     parser.add_argument("--partition", type=int, default=10,
@@ -159,8 +164,8 @@ if __name__ == '__main__':
     dim = args.dim
     name = args.axis_name
     ax_num = args.axis_number
-    
-    fname = f'{name}_{ax_num}'
+    str_plus = '+' if args.axis_plus else '-'
+    fname = f'{name}_{ax_num}_{str_plus}'
     movie_path = f'{args.outdir}/movie_simplex/{fname}'
     flip_path = f'{args.outdir}/flip_simplex/{fname}'
     os.makedirs(movie_path, exist_ok=True)
@@ -185,11 +190,13 @@ if __name__ == '__main__':
         fit_pnts = np.transpose(np.array(fit_pnts))
     
     with h5py.File(args.axis, 'r') as f:
-        G = f['G_tmp'][:]
+        G = f['G'][:]
         
     d, v = np.linalg.eig(G)
+    d = np.sort(d)[::-1]
     d = d[ax_num]
-    v = v[ax_num]
+    v = v[ax_num] if args.axis_plus else -v[ax_num]
+    
     
     pca_pnts = pca(pnts, fit_pnts, dim)
     partition = args.partition
@@ -200,11 +207,13 @@ if __name__ == '__main__':
     ax_step = v * ax_len / partition # 1step : 1/100*ax_len
     base_point = pca_pnts[face2idx_tr[name]]
     styles_st = torch.tensor(np.load(os.path.join(args.latent_indir, f'{name}.npy')), device=device0)
-
+    
+    print(f'faicial : {name}')
+    print(f'axis : {ax_num}')
     b = 0
     c = 0
     styles_simplex_list = [styles_st]
-    print(d, v)
+    print(f'eig : {d}, {v}')
 
     print(f'Serching for {dim}-simplex')
     for p in range(partition) :
@@ -212,8 +221,9 @@ if __name__ == '__main__':
         ed = base_point + ax_step * (p + 1)
 
         print(p + 1)
-        x, x_inds, gamma = search_nearpnts(pca_pnts, st, ed, ax_step, dim, args, G)
-        plot3d(pca_pnts, x, x_inds, st, ed, dim, 1, p, args)
+        x, x_inds, gamma = search_nearpnts(pca_pnts, st, ed, ax_step, dim, args)
+        plot3d(pca_pnts, x, x_inds, st, ed, dim, 1, p, args, 0)
+        plot3d(pca_pnts, x, x_inds, st, ed, dim, 1, p, args, 1)
 
         styles_x_list=[]
         for x_idx in x_inds :

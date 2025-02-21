@@ -132,16 +132,8 @@ dmypy.json
 data/
 
 # SemanticStyleGAN
-
 /pretrained/*
-
 /images/*
-
-/memo*
-/log*
-
-/results/*
-
-/movemp4.py
-
 /mat/*
+/results/*
+/log*
